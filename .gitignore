@@ -1,0 +1,15 @@
+# Visual Studio / IDE Caches
+.vs/
+**/[B|b]in/
+**/[O|o]bj/
+*.user
+*.suo
+
+# Python Caches
+__pycache__/
+*.pyc
+*.pyo
+
+# OS/System files
+Thumbs.db
+.DS_Store
