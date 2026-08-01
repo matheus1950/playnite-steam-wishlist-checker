@@ -5,12 +5,22 @@ import time
 import queue
 import threading
 import webbrowser
+import subprocess
 from pathlib import Path
+from datetime import datetime
 from tkinter import ttk, messagebox
 
 import customtkinter as ctk
 import requests
 from rapidfuzz import process, fuzz
+
+
+# ============================================================
+# APLICATIVO
+# ============================================================
+
+APP_NAME = "Steam Wishlist × Playnite"
+APP_VERSION = "1.1.0"
 
 
 # ============================================================
@@ -21,40 +31,66 @@ STEAM_ID_64 = "76561198349875986"
 
 FUZZY_SCORE_CUTOFF = 85
 
-# Mantemos a regra atual:
-# jogos da própria Steam não entram na comparação.
 IGNORE_STEAM_SOURCE = True
 
 STEAM_APP_REQUEST_DELAY = 0.08
 
 
-PLAYNITE_EXPORT_FILE = Path(
+# ============================================================
+# CAMINHOS
+# ============================================================
+
+APPDATA = Path(
     os.path.expandvars(
-        r"%APPDATA%\Playnite\steam_wishlist_checker_library.json"
+        r"%APPDATA%"
+    )
+)
+
+LOCALAPPDATA = Path(
+    os.path.expandvars(
+        r"%LOCALAPPDATA%"
     )
 )
 
 
-# ============================================================
-# COMANDO PARA EXPORTAÇÃO MANUAL DO PLAYNITE
-# ============================================================
+PLAYNITE_DATA_DIR = (
+    APPDATA
+    /
+    "Playnite"
+)
 
-PLAYNITE_EXPORT_COMMAND = (
-    '$PlayniteApi.Database.Games | '
-    'ForEach-Object { '
-    '[PSCustomObject]@{ '
-    'Name=$_.Name; '
-    'Source=if ($_.Source) {$_.Source.Name} else {""}; '
-    'PluginId="$($_.PluginId)"; '
-    'GameId="$($_.GameId)"; '
-    'IsInstalled=$_.IsInstalled; '
-    'Hidden=$_.Hidden '
-    '} } | '
-    'ConvertTo-Json -Depth 4 | '
-    'Set-Content '
-    '"$env:APPDATA\\Playnite\\'
-    'steam_wishlist_checker_library.json" '
-    '-Encoding UTF8'
+PLAYNITE_EXPORT_FILE = (
+    PLAYNITE_DATA_DIR
+    /
+    "steam_wishlist_checker_library.json"
+)
+
+PLAYNITE_PLUGIN_DIR = (
+    PLAYNITE_DATA_DIR
+    /
+    "Extensions"
+    /
+    "SteamWishlistExporter"
+)
+
+PLAYNITE_PLUGIN_DLL = (
+    PLAYNITE_PLUGIN_DIR
+    /
+    "SteamWishlistExporter.dll"
+)
+
+PLAYNITE_PLUGIN_MANIFEST = (
+    PLAYNITE_PLUGIN_DIR
+    /
+    "extension.yaml"
+)
+
+PLAYNITE_EXE = (
+    LOCALAPPDATA
+    /
+    "Playnite"
+    /
+    "Playnite.DesktopApp.exe"
 )
 
 
@@ -67,7 +103,7 @@ ctk.set_default_color_theme("blue")
 
 
 # ============================================================
-# NORMALIZAÇÃO DOS NOMES
+# NORMALIZAÇÃO
 # ============================================================
 
 def clean_title(title: str) -> str:
@@ -83,7 +119,10 @@ def clean_title(title: str) -> str:
         .replace("©", "")
     )
 
-    title = title.replace("&", " and ")
+    title = title.replace(
+        "&",
+        " and "
+    )
 
     title = re.sub(
         r"[^\w\s]",
@@ -98,111 +137,363 @@ def clean_title(title: str) -> str:
 
 
 # ============================================================
-# PLAYNITE
+# PLAYNITE - PROCESSO
+# ============================================================
+
+def is_playnite_running():
+    try:
+        result = subprocess.run(
+            [
+                "tasklist",
+                "/FI",
+                "IMAGENAME eq Playnite.DesktopApp.exe"
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="ignore",
+            creationflags=(
+                subprocess.CREATE_NO_WINDOW
+                if os.name == "nt"
+                else 0
+            )
+        )
+
+        return (
+            "Playnite.DesktopApp.exe"
+            in result.stdout
+        )
+
+    except Exception:
+        return False
+
+
+# ============================================================
+# PLAYNITE - STATUS DA INTEGRAÇÃO
+# ============================================================
+
+def get_playnite_integration_status():
+    """
+    Retorna um resumo da integração Playnite.
+
+    Não usa SDK Interativo.
+    """
+
+    playnite_installed = (
+        PLAYNITE_EXE.exists()
+    )
+
+    plugin_dir_exists = (
+        PLAYNITE_PLUGIN_DIR.is_dir()
+    )
+
+    plugin_dll_exists = (
+        PLAYNITE_PLUGIN_DLL.is_file()
+    )
+
+    plugin_manifest_exists = (
+        PLAYNITE_PLUGIN_MANIFEST.is_file()
+    )
+
+    plugin_installed = (
+        plugin_dir_exists
+        and
+        plugin_dll_exists
+        and
+        plugin_manifest_exists
+    )
+
+    export_exists = (
+        PLAYNITE_EXPORT_FILE.is_file()
+    )
+
+    export_size = 0
+    export_modified = None
+
+    if export_exists:
+
+        try:
+            stat = (
+                PLAYNITE_EXPORT_FILE.stat()
+            )
+
+            export_size = (
+                stat.st_size
+            )
+
+            export_modified = (
+                datetime.fromtimestamp(
+                    stat.st_mtime
+                )
+            )
+
+        except Exception:
+            pass
+
+    return {
+        "playnite_installed":
+            playnite_installed,
+
+        "playnite_running":
+            is_playnite_running(),
+
+        "plugin_installed":
+            plugin_installed,
+
+        "plugin_dir_exists":
+            plugin_dir_exists,
+
+        "plugin_dll_exists":
+            plugin_dll_exists,
+
+        "plugin_manifest_exists":
+            plugin_manifest_exists,
+
+        "export_exists":
+            export_exists,
+
+        "export_size":
+            export_size,
+
+        "export_modified":
+            export_modified,
+    }
+
+
+# ============================================================
+# FORMATA DATA
+# ============================================================
+
+def format_datetime(value):
+    if not value:
+        return "—"
+
+    return value.strftime(
+        "%d/%m/%Y às %H:%M:%S"
+    )
+
+
+# ============================================================
+# TEMPO DESDE A SINCRONIZAÇÃO
+# ============================================================
+
+def format_age(value):
+    if not value:
+        return "Nunca"
+
+    now = datetime.now()
+
+    delta = (
+        now
+        -
+        value
+    )
+
+    seconds = max(
+        0,
+        int(
+            delta.total_seconds()
+        )
+    )
+
+    if seconds < 60:
+
+        return (
+            "há menos de 1 minuto"
+        )
+
+    minutes = (
+        seconds // 60
+    )
+
+    if minutes < 60:
+
+        if minutes == 1:
+            return "há 1 minuto"
+
+        return (
+            f"há {minutes} minutos"
+        )
+
+    hours = (
+        minutes // 60
+    )
+
+    if hours < 24:
+
+        if hours == 1:
+            return "há 1 hora"
+
+        return (
+            f"há {hours} horas"
+        )
+
+    days = (
+        hours // 24
+    )
+
+    if days == 1:
+        return "há 1 dia"
+
+    return (
+        f"há {days} dias"
+    )
+
+
+# ============================================================
+# PLAYNITE - LÊ JSON
 # ============================================================
 
 def read_playnite_export():
-    """
-    Lê o JSON previamente criado pelo SDK Interativo
-    PowerShell do Playnite.
-    """
-
     if not PLAYNITE_EXPORT_FILE.exists():
+
         raise FileNotFoundError(
-            "O arquivo exportado pelo Playnite não foi encontrado."
+            "A biblioteca exportada pelo Playnite "
+            "ainda não foi encontrada."
         )
 
     try:
+
         with PLAYNITE_EXPORT_FILE.open(
             "r",
             encoding="utf-8-sig"
         ) as f:
+
             data = json.load(f)
 
     except json.JSONDecodeError as e:
+
         raise RuntimeError(
-            f"O JSON exportado pelo Playnite é inválido:\n{e}"
+            "O arquivo exportado pelo Playnite "
+            "não contém JSON válido.\n\n"
+            f"{e}"
         )
 
     except Exception as e:
+
         raise RuntimeError(
-            f"Não foi possível ler o arquivo do Playnite:\n{e}"
+            "Não foi possível ler a biblioteca "
+            "exportada pelo Playnite.\n\n"
+            f"{e}"
         )
 
-    if isinstance(data, dict):
+    if isinstance(
+        data,
+        dict
+    ):
         data = [data]
 
-    if not isinstance(data, list):
+    if not isinstance(
+        data,
+        list
+    ):
+
         raise RuntimeError(
-            "Formato inesperado no arquivo exportado pelo Playnite."
+            "Formato inesperado na biblioteca "
+            "exportada pelo Playnite."
         )
 
     games = []
 
     for item in data:
-        if not isinstance(item, dict):
+
+        if not isinstance(
+            item,
+            dict
+        ):
             continue
 
         name = str(
-            item.get("Name", "")
-            or ""
+            item.get(
+                "Name",
+                ""
+            )
+            or
+            ""
         ).strip()
 
         if not name:
             continue
 
         games.append({
-            "name": name,
 
-            "source": str(
-                item.get("Source", "")
-                or ""
-            ).strip(),
+            "name":
+                name,
 
-            "plugin_id": str(
-                item.get("PluginId", "")
-                or ""
-            ).strip(),
+            "source":
+                str(
+                    item.get(
+                        "Source",
+                        ""
+                    )
+                    or
+                    ""
+                ).strip(),
 
-            "game_id": str(
-                item.get("GameId", "")
-                or ""
-            ).strip(),
+            "plugin_id":
+                str(
+                    item.get(
+                        "PluginId",
+                        ""
+                    )
+                    or
+                    ""
+                ).strip(),
 
-            "installed": bool(
-                item.get(
-                    "IsInstalled",
-                    False
-                )
-            ),
+            "game_id":
+                str(
+                    item.get(
+                        "GameId",
+                        ""
+                    )
+                    or
+                    ""
+                ).strip(),
 
-            "hidden": bool(
-                item.get(
-                    "Hidden",
-                    False
-                )
-            ),
+            "installed":
+                bool(
+                    item.get(
+                        "IsInstalled",
+                        False
+                    )
+                ),
+
+            "hidden":
+                bool(
+                    item.get(
+                        "Hidden",
+                        False
+                    )
+                ),
         })
 
     return games
 
 
 # ============================================================
-# FONTES DO PLAYNITE
+# FONTES
 # ============================================================
 
-def get_source_counts(games):
+def get_source_counts(
+    games
+):
     counts = {}
 
     for game in games:
+
         source = (
-            game.get("source")
+            game.get(
+                "source"
+            )
             or
             "Sem fonte"
         )
 
         counts[source] = (
-            counts.get(source, 0)
+            counts.get(
+                source,
+                0
+            )
             +
             1
         )
@@ -210,15 +501,25 @@ def get_source_counts(games):
     return counts
 
 
-def filter_playnite_games(games):
+# ============================================================
+# FILTRO PLAYNITE
+# ============================================================
+
+def filter_playnite_games(
+    games
+):
+
     if not IGNORE_STEAM_SOURCE:
         return games
 
     filtered = []
 
     for game in games:
+
         source = (
-            game.get("source")
+            game.get(
+                "source"
+            )
             or
             ""
         ).strip().lower()
@@ -226,55 +527,62 @@ def filter_playnite_games(games):
         if source == "steam":
             continue
 
-        filtered.append(game)
+        filtered.append(
+            game
+        )
 
     return filtered
 
 
 # ============================================================
-# STEAM
+# STEAM SESSION
 # ============================================================
 
 def create_steam_session():
-    session = requests.Session()
+
+    session = (
+        requests.Session()
+    )
 
     session.headers.update({
-        "User-Agent": (
+
+        "User-Agent":
             "Mozilla/5.0 "
             "(Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 "
             "(KHTML, like Gecko) "
             "Chrome/120.0.0.0 "
-            "Safari/537.36"
-        ),
+            "Safari/537.36",
 
-        "Accept": (
+        "Accept":
             "application/json,"
             "text/plain,"
             "*/*"
-        ),
     })
 
     return session
 
 
 # ============================================================
-# APPIDS DA WISHLIST
+# STEAM WISHLIST
 # ============================================================
 
 def get_steam_wishlist_appids(
     steam_id,
     session
 ):
+
     url = (
         "https://api.steampowered.com/"
         "IWishlistService/GetWishlist/v1/"
     )
 
     params = {
-        "input_json": json.dumps({
-            "steamid": steam_id
-        })
+        "input_json":
+            json.dumps({
+                "steamid":
+                    steam_id
+            })
     }
 
     response = session.get(
@@ -284,34 +592,54 @@ def get_steam_wishlist_appids(
     )
 
     if response.status_code != 200:
+
         raise RuntimeError(
-            f"A Steam respondeu com HTTP "
+            "A Steam respondeu com HTTP "
             f"{response.status_code}."
         )
 
     try:
-        data = response.json()
+
+        data = (
+            response.json()
+        )
 
     except requests.exceptions.JSONDecodeError:
+
         raise RuntimeError(
             "A Steam não retornou JSON válido."
         )
 
     items = (
         data
-        .get("response", {})
-        .get("items", [])
+        .get(
+            "response",
+            {}
+        )
+        .get(
+            "items",
+            []
+        )
     )
 
     appids = []
 
     for item in items:
-        if not isinstance(item, dict):
+
+        if not isinstance(
+            item,
+            dict
+        ):
             continue
 
-        appid = item.get("appid")
+        appid = (
+            item.get(
+                "appid"
+            )
+        )
 
         if appid is not None:
+
             appids.append(
                 str(appid)
             )
@@ -324,38 +652,53 @@ def get_steam_wishlist_appids(
 
 
 # ============================================================
-# APPID -> NOME
+# STEAM APP NAME
 # ============================================================
 
 def get_steam_app_name(
     appid,
     session
 ):
+
     url = (
         "https://store.steampowered.com/"
         "api/appdetails"
     )
 
     params = {
-        "appids": appid,
-        "l": "english",
-        "cc": "br"
+        "appids":
+            appid,
+
+        "l":
+            "english",
+
+        "cc":
+            "br"
     }
 
     try:
+
         response = session.get(
             url,
             params=params,
             timeout=20
         )
 
-        if response.status_code != 200:
+        if (
+            response.status_code
+            !=
+            200
+        ):
             return None
 
-        data = response.json()
+        data = (
+            response.json()
+        )
 
-        app_data = data.get(
-            str(appid)
+        app_data = (
+            data.get(
+                str(appid)
+            )
         )
 
         if not isinstance(
@@ -371,12 +714,23 @@ def get_steam_app_name(
 
         name = (
             app_data
-            .get("data", {})
-            .get("name")
+            .get(
+                "data",
+                {}
+            )
+            .get(
+                "name"
+            )
         )
 
-        if isinstance(name, str):
-            return name.strip()
+        if isinstance(
+            name,
+            str
+        ):
+
+            return (
+                name.strip()
+            )
 
     except Exception:
         pass
@@ -385,18 +739,22 @@ def get_steam_app_name(
 
 
 # ============================================================
-# COMPARAÇÃO
+# MATCH
 # ============================================================
 
 def compare_games(
     wishlist,
     playnite_games
 ):
+
     normalized_playnite = {}
 
     for game in playnite_games:
-        normalized = clean_title(
-            game["name"]
+
+        normalized = (
+            clean_title(
+                game["name"]
+            )
         )
 
         if not normalized:
@@ -409,84 +767,130 @@ def compare_games(
 
         normalized_playnite[
             normalized
-        ].append(game)
+        ].append(
+            game
+        )
 
     exact_matches = []
     fuzzy_matches = []
 
-    for wishlist_name, appid in wishlist.items():
+    for (
+        wishlist_name,
+        appid
+    ) in wishlist.items():
 
-        normalized = clean_title(
-            wishlist_name
+        normalized = (
+            clean_title(
+                wishlist_name
+            )
         )
 
         # ----------------------------------------------------
-        # MATCH EXATO
+        # EXATO
         # ----------------------------------------------------
 
-        if normalized in normalized_playnite:
+        if (
+            normalized
+            in
+            normalized_playnite
+        ):
 
-            for game in normalized_playnite[
-                normalized
-            ]:
+            for game in (
+                normalized_playnite[
+                    normalized
+                ]
+            ):
 
                 exact_matches.append({
-                    "wishlist": wishlist_name,
-                    "appid": appid,
-                    "playnite": game["name"],
-                    "source": (
-                        game["source"]
-                        or
-                        "Sem fonte"
-                    ),
-                    "score": 100.0,
-                    "type": "Exato"
+
+                    "wishlist":
+                        wishlist_name,
+
+                    "appid":
+                        appid,
+
+                    "playnite":
+                        game["name"],
+
+                    "source":
+                        (
+                            game["source"]
+                            or
+                            "Sem fonte"
+                        ),
+
+                    "score":
+                        100.0,
+
+                    "type":
+                        "Exato"
                 })
 
             continue
 
         # ----------------------------------------------------
-        # MATCH FUZZY
+        # FUZZY
         # ----------------------------------------------------
 
         if not normalized_playnite:
             continue
 
-        match = process.extractOne(
-            normalized,
-            normalized_playnite.keys(),
-            scorer=fuzz.token_sort_ratio,
-            score_cutoff=(
-                FUZZY_SCORE_CUTOFF
+        match = (
+            process.extractOne(
+                normalized,
+                normalized_playnite.keys(),
+                scorer=
+                    fuzz.token_sort_ratio,
+                score_cutoff=
+                    FUZZY_SCORE_CUTOFF
             )
         )
 
         if not match:
             continue
 
-        matched_key = match[0]
-        score = match[1]
+        matched_key = (
+            match[0]
+        )
 
-        for game in normalized_playnite[
-            matched_key
-        ]:
+        score = (
+            match[1]
+        )
+
+        for game in (
+            normalized_playnite[
+                matched_key
+            ]
+        ):
 
             fuzzy_matches.append({
-                "wishlist": wishlist_name,
-                "appid": appid,
-                "playnite": game["name"],
-                "source": (
-                    game["source"]
-                    or
-                    "Sem fonte"
-                ),
-                "score": score,
-                "type": "Aproximado"
+
+                "wishlist":
+                    wishlist_name,
+
+                "appid":
+                    appid,
+
+                "playnite":
+                    game["name"],
+
+                "source":
+                    (
+                        game["source"]
+                        or
+                        "Sem fonte"
+                    ),
+
+                "score":
+                    score,
+
+                "type":
+                    "Aproximado"
             })
 
     exact_matches.sort(
         key=lambda x:
-        x["wishlist"].lower()
+            x["wishlist"].lower()
     )
 
     fuzzy_matches.sort(
@@ -496,14 +900,19 @@ def compare_games(
         )
     )
 
-    return exact_matches, fuzzy_matches
+    return (
+        exact_matches,
+        fuzzy_matches
+    )
 
 
 # ============================================================
 # GUI
 # ============================================================
 
-class WishlistApp(ctk.CTk):
+class WishlistApp(
+    ctk.CTk
+):
 
     def __init__(self):
         super().__init__()
@@ -513,7 +922,7 @@ class WishlistApp(ctk.CTk):
         # ----------------------------------------------------
 
         self.title(
-            "Steam Wishlist × Playnite"
+            APP_NAME
         )
 
         self.geometry(
@@ -529,7 +938,9 @@ class WishlistApp(ctk.CTk):
         # ESTADO
         # ----------------------------------------------------
 
-        self.event_queue = queue.Queue()
+        self.event_queue = (
+            queue.Queue()
+        )
 
         self.loading = False
 
@@ -547,8 +958,10 @@ class WishlistApp(ctk.CTk):
 
         self.failed_steam_names = 0
 
+        self.integration_status = {}
+
         # ----------------------------------------------------
-        # GRID PRINCIPAL
+        # GRID
         # ----------------------------------------------------
 
         self.grid_columnconfigure(
@@ -566,36 +979,16 @@ class WishlistApp(ctk.CTk):
             weight=1
         )
 
-        # ----------------------------------------------------
-        # SIDEBAR
-        # ----------------------------------------------------
-
         self.create_sidebar()
-
-        # ----------------------------------------------------
-        # CONTEÚDO
-        # ----------------------------------------------------
 
         self.create_main_area()
 
-        # ----------------------------------------------------
-        # TREEVIEW STYLE
-        # ----------------------------------------------------
-
         self.configure_treeview_style()
-
-        # ----------------------------------------------------
-        # FILA THREAD
-        # ----------------------------------------------------
 
         self.after(
             100,
             self.process_event_queue
         )
-
-        # ----------------------------------------------------
-        # CARREGA APENAS PLAYNITE AO ABRIR
-        # ----------------------------------------------------
 
         self.after(
             300,
@@ -607,12 +1000,16 @@ class WishlistApp(ctk.CTk):
     # SIDEBAR
     # ========================================================
 
-    def create_sidebar(self):
+    def create_sidebar(
+        self
+    ):
 
-        self.sidebar = ctk.CTkFrame(
-            self,
-            width=240,
-            corner_radius=0
+        self.sidebar = (
+            ctk.CTkFrame(
+                self,
+                width=240,
+                corner_radius=0
+            )
         )
 
         self.sidebar.grid(
@@ -624,10 +1021,6 @@ class WishlistApp(ctk.CTk):
         self.sidebar.grid_propagate(
             False
         )
-
-        # ----------------------------------------------------
-        # TÍTULO
-        # ----------------------------------------------------
 
         title = ctk.CTkLabel(
             self.sidebar,
@@ -662,19 +1055,44 @@ class WishlistApp(ctk.CTk):
             padx=25,
             pady=(
                 0,
-                30
+                5
+            )
+        )
+
+        version_label = (
+            ctk.CTkLabel(
+                self.sidebar,
+                text=(
+                    f"v{APP_VERSION}"
+                ),
+                font=ctk.CTkFont(
+                    size=11
+                ),
+                text_color="gray55"
+            )
+        )
+
+        version_label.pack(
+            anchor="w",
+            padx=25,
+            pady=(
+                0,
+                25
             )
         )
 
         # ----------------------------------------------------
-        # BOTÃO ATUALIZAR
+        # ATUALIZAR
         # ----------------------------------------------------
 
-        self.refresh_button = ctk.CTkButton(
-            self.sidebar,
-            text="Atualizar dados",
-            height=42,
-            command=self.start_refresh
+        self.refresh_button = (
+            ctk.CTkButton(
+                self.sidebar,
+                text="Atualizar dados",
+                height=42,
+                command=
+                    self.start_refresh
+            )
         )
 
         self.refresh_button.pack(
@@ -684,31 +1102,32 @@ class WishlistApp(ctk.CTk):
         )
 
         # ----------------------------------------------------
-        # SDK
+        # INTEGRAÇÃO
         # ----------------------------------------------------
 
-        sdk_button = ctk.CTkButton(
-            self.sidebar,
-            text="Como atualizar Playnite",
-            height=40,
-            fg_color="transparent",
-            border_width=1,
-            command=self.show_sdk_instructions
+        integration_button = (
+            ctk.CTkButton(
+                self.sidebar,
+                text="Integração Playnite",
+                height=40,
+                fg_color="transparent",
+                border_width=1,
+                command=
+                    self.show_integration_info
+            )
         )
 
-        sdk_button.pack(
+        integration_button.pack(
             fill="x",
             padx=20,
             pady=8
         )
 
-        # ----------------------------------------------------
-        # INFORMAÇÕES
-        # ----------------------------------------------------
-
-        separator = ctk.CTkFrame(
-            self.sidebar,
-            height=1
+        separator = (
+            ctk.CTkFrame(
+                self.sidebar,
+                height=1
+            )
         )
 
         separator.pack(
@@ -717,26 +1136,33 @@ class WishlistApp(ctk.CTk):
             pady=20
         )
 
-        info_title = ctk.CTkLabel(
-            self.sidebar,
-            text="Status",
-            font=ctk.CTkFont(
-                size=15,
-                weight="bold"
+        status_title = (
+            ctk.CTkLabel(
+                self.sidebar,
+                text="Status",
+                font=ctk.CTkFont(
+                    size=15,
+                    weight="bold"
+                )
             )
         )
 
-        info_title.pack(
+        status_title.pack(
             anchor="w",
             padx=25
         )
 
+        # ----------------------------------------------------
+        # PLAYNITE STATUS
+        # ----------------------------------------------------
+
         self.playnite_status_label = (
             ctk.CTkLabel(
                 self.sidebar,
-                text="Playnite: —",
+                text="Playnite: verificando...",
                 anchor="w",
-                justify="left"
+                justify="left",
+                wraplength=190
             )
         )
 
@@ -749,23 +1175,71 @@ class WishlistApp(ctk.CTk):
             )
         )
 
-        self.steam_status_label = (
+        # ----------------------------------------------------
+        # PLUGIN
+        # ----------------------------------------------------
+
+        self.plugin_status_label = (
             ctk.CTkLabel(
                 self.sidebar,
-                text="Steam: —",
+                text="Plugin: verificando...",
                 anchor="w",
-                justify="left"
+                justify="left",
+                wraplength=190
             )
         )
 
-        self.steam_status_label.pack(
+        self.plugin_status_label.pack(
             fill="x",
             padx=25,
             pady=2
         )
 
         # ----------------------------------------------------
-        # ARQUIVO
+        # SINCRONIZAÇÃO
+        # ----------------------------------------------------
+
+        self.sync_status_label = (
+            ctk.CTkLabel(
+                self.sidebar,
+                text="Sincronização: verificando...",
+                anchor="w",
+                justify="left",
+                wraplength=190
+            )
+        )
+
+        self.sync_status_label.pack(
+            fill="x",
+            padx=25,
+            pady=2
+        )
+
+        # ----------------------------------------------------
+        # STEAM
+        # ----------------------------------------------------
+
+        self.steam_status_label = (
+            ctk.CTkLabel(
+                self.sidebar,
+                text="Steam: —",
+                anchor="w",
+                justify="left",
+                wraplength=190
+            )
+        )
+
+        self.steam_status_label.pack(
+            fill="x",
+            padx=25,
+            pady=(
+                15,
+                2
+            )
+        )
+
+        # ----------------------------------------------------
+        # DETALHES JSON
         # ----------------------------------------------------
 
         self.file_status_label = (
@@ -793,15 +1267,19 @@ class WishlistApp(ctk.CTk):
 
 
     # ========================================================
-    # MAIN AREA
+    # CONTEÚDO
     # ========================================================
 
-    def create_main_area(self):
+    def create_main_area(
+        self
+    ):
 
-        self.main_frame = ctk.CTkFrame(
-            self,
-            corner_radius=0,
-            fg_color="transparent"
+        self.main_frame = (
+            ctk.CTkFrame(
+                self,
+                corner_radius=0,
+                fg_color="transparent"
+            )
         )
 
         self.main_frame.grid(
@@ -826,9 +1304,11 @@ class WishlistApp(ctk.CTk):
         # HEADER
         # ----------------------------------------------------
 
-        header = ctk.CTkFrame(
-            self.main_frame,
-            fg_color="transparent"
+        header = (
+            ctk.CTkFrame(
+                self.main_frame,
+                fg_color="transparent"
+            )
         )
 
         header.grid(
@@ -841,15 +1321,17 @@ class WishlistApp(ctk.CTk):
             )
         )
 
-        title = ctk.CTkLabel(
-            header,
-            text=(
-                "Jogos da wishlist que "
-                "você já possui"
-            ),
-            font=ctk.CTkFont(
-                size=26,
-                weight="bold"
+        title = (
+            ctk.CTkLabel(
+                header,
+                text=(
+                    "Jogos da wishlist que "
+                    "você já possui"
+                ),
+                font=ctk.CTkFont(
+                    size=26,
+                    weight="bold"
+                )
             )
         )
 
@@ -861,9 +1343,11 @@ class WishlistApp(ctk.CTk):
         # CARDS
         # ----------------------------------------------------
 
-        cards = ctk.CTkFrame(
-            self.main_frame,
-            fg_color="transparent"
+        cards = (
+            ctk.CTkFrame(
+                self.main_frame,
+                fg_color="transparent"
+            )
         )
 
         cards.grid(
@@ -877,45 +1361,56 @@ class WishlistApp(ctk.CTk):
         )
 
         for col in range(4):
+
             cards.grid_columnconfigure(
                 col,
                 weight=1
             )
 
-        self.card_playnite = self.create_card(
-            cards,
-            0,
-            "Playnite",
-            "—"
+        self.card_playnite = (
+            self.create_card(
+                cards,
+                0,
+                "Playnite",
+                "—"
+            )
         )
 
-        self.card_wishlist = self.create_card(
-            cards,
-            1,
-            "Wishlist Steam",
-            "—"
+        self.card_wishlist = (
+            self.create_card(
+                cards,
+                1,
+                "Wishlist Steam",
+                "—"
+            )
         )
 
-        self.card_matches = self.create_card(
-            cards,
-            2,
-            "Já possui",
-            "—"
+        self.card_matches = (
+            self.create_card(
+                cards,
+                2,
+                "Já possui",
+                "—"
+            )
         )
 
-        self.card_unresolved = self.create_card(
-            cards,
-            3,
-            "Não identificados",
-            "—"
+        self.card_unresolved = (
+            self.create_card(
+                cards,
+                3,
+                "Não identificados",
+                "—"
+            )
         )
 
         # ----------------------------------------------------
         # FILTROS
         # ----------------------------------------------------
 
-        filters = ctk.CTkFrame(
-            self.main_frame
+        filters = (
+            ctk.CTkFrame(
+                self.main_frame
+            )
         )
 
         filters.grid(
@@ -933,12 +1428,13 @@ class WishlistApp(ctk.CTk):
             weight=1
         )
 
-        self.search_entry = ctk.CTkEntry(
-            filters,
-            placeholder_text=(
-                "Pesquisar jogo..."
-            ),
-            height=38
+        self.search_entry = (
+            ctk.CTkEntry(
+                filters,
+                placeholder_text=
+                    "Pesquisar jogo...",
+                height=38
+            )
         )
 
         self.search_entry.grid(
@@ -997,7 +1493,7 @@ class WishlistApp(ctk.CTk):
         )
 
         # ----------------------------------------------------
-        # CONTAGEM
+        # RESULT COUNT
         # ----------------------------------------------------
 
         self.result_count_label = (
@@ -1022,8 +1518,10 @@ class WishlistApp(ctk.CTk):
         # TABELA
         # ----------------------------------------------------
 
-        table_frame = ctk.CTkFrame(
-            self.main_frame
+        table_frame = (
+            ctk.CTkFrame(
+                self.main_frame
+            )
         )
 
         table_frame.grid(
@@ -1050,11 +1548,13 @@ class WishlistApp(ctk.CTk):
             "score"
         )
 
-        self.tree = ttk.Treeview(
-            table_frame,
-            columns=columns,
-            show="headings",
-            selectmode="browse"
+        self.tree = (
+            ttk.Treeview(
+                table_frame,
+                columns=columns,
+                show="headings",
+                selectmode="browse"
+            )
         )
 
         self.tree.heading(
@@ -1113,16 +1613,18 @@ class WishlistApp(ctk.CTk):
             anchor="center"
         )
 
-        scrollbar = ttk.Scrollbar(
-            table_frame,
-            orient="vertical",
-            command=self.tree.yview
+        scrollbar = (
+            ttk.Scrollbar(
+                table_frame,
+                orient="vertical",
+                command=
+                    self.tree.yview
+            )
         )
 
         self.tree.configure(
-            yscrollcommand=(
+            yscrollcommand=
                 scrollbar.set
-            )
         )
 
         self.tree.grid(
@@ -1150,12 +1652,14 @@ class WishlistApp(ctk.CTk):
         )
 
         # ----------------------------------------------------
-        # BARRA INFERIOR
+        # FOOTER
         # ----------------------------------------------------
 
-        footer = ctk.CTkFrame(
-            self.main_frame,
-            fg_color="transparent"
+        footer = (
+            ctk.CTkFrame(
+                self.main_frame,
+                fg_color="transparent"
+            )
         )
 
         footer.grid(
@@ -1203,7 +1707,9 @@ class WishlistApp(ctk.CTk):
             )
         )
 
-        self.progress_bar.set(0)
+        self.progress_bar.set(
+            0
+        )
 
 
     # ========================================================
@@ -1218,8 +1724,10 @@ class WishlistApp(ctk.CTk):
         value
     ):
 
-        frame = ctk.CTkFrame(
-            parent
+        frame = (
+            ctk.CTkFrame(
+                parent
+            )
         )
 
         frame.grid(
@@ -1227,12 +1735,17 @@ class WishlistApp(ctk.CTk):
             column=column,
             sticky="ew",
             padx=(
-                0 if column == 0 else 6,
-                0 if column == 3 else 6
+                0
+                if column == 0
+                else 6,
+
+                0
+                if column == 3
+                else 6
             )
         )
 
-        label_title = (
+        title_label = (
             ctk.CTkLabel(
                 frame,
                 text=title,
@@ -1243,7 +1756,7 @@ class WishlistApp(ctk.CTk):
             )
         )
 
-        label_title.pack(
+        title_label.pack(
             anchor="w",
             padx=18,
             pady=(
@@ -1252,7 +1765,7 @@ class WishlistApp(ctk.CTk):
             )
         )
 
-        label_value = (
+        value_label = (
             ctk.CTkLabel(
                 frame,
                 text=value,
@@ -1263,7 +1776,7 @@ class WishlistApp(ctk.CTk):
             )
         )
 
-        label_value.pack(
+        value_label.pack(
             anchor="w",
             padx=18,
             pady=(
@@ -1272,11 +1785,11 @@ class WishlistApp(ctk.CTk):
             )
         )
 
-        return label_value
+        return value_label
 
 
     # ========================================================
-    # TREEVIEW STYLE
+    # TREE STYLE
     # ========================================================
 
     def configure_treeview_style(
@@ -1327,27 +1840,154 @@ class WishlistApp(ctk.CTk):
             ]
         )
 
-        style.map(
-            "Treeview.Heading",
-            background=[
-                (
-                    "active",
-                    "#3b3b3b"
-                )
-            ]
+
+    # ========================================================
+    # ATUALIZA STATUS PLAYNITE
+    # ========================================================
+
+    def update_integration_status_ui(
+        self
+    ):
+
+        status = (
+            get_playnite_integration_status()
         )
 
+        self.integration_status = (
+            status
+        )
+
+        # ----------------------------------------------------
+        # PLAYNITE
+        # ----------------------------------------------------
+
+        if not status[
+            "playnite_installed"
+        ]:
+
+            self.playnite_status_label.configure(
+                text="Playnite: ✕ não encontrado"
+            )
+
+        elif status[
+            "playnite_running"
+        ]:
+
+            self.playnite_status_label.configure(
+                text="Playnite: ✓ em execução"
+            )
+
+        else:
+
+            self.playnite_status_label.configure(
+                text="Playnite: ✓ instalado"
+            )
+
+        # ----------------------------------------------------
+        # PLUGIN
+        # ----------------------------------------------------
+
+        if status[
+            "plugin_installed"
+        ]:
+
+            self.plugin_status_label.configure(
+                text="Plugin: ✓ instalado"
+            )
+
+        else:
+
+            self.plugin_status_label.configure(
+                text="Plugin: ✕ não encontrado"
+            )
+
+        # ----------------------------------------------------
+        # EXPORTAÇÃO
+        # ----------------------------------------------------
+
+        if status[
+            "export_exists"
+        ]:
+
+            modified = (
+                status[
+                    "export_modified"
+                ]
+            )
+
+            self.sync_status_label.configure(
+                text=(
+                    "Biblioteca: ✓ sincronizada\n"
+                    +
+                    format_age(
+                        modified
+                    )
+                )
+            )
+
+            size_kb = (
+                status[
+                    "export_size"
+                ]
+                /
+                1024
+            )
+
+            self.file_status_label.configure(
+                text=(
+                    "Última sincronização\n"
+                    f"{format_datetime(modified)}\n"
+                    f"{size_kb:.1f} KB"
+                )
+            )
+
+        else:
+
+            self.sync_status_label.configure(
+                text=(
+                    "Biblioteca: ✕ "
+                    "não sincronizada"
+                )
+            )
+
+            self.file_status_label.configure(
+                text=(
+                    "O plugin ainda não criou "
+                    "a biblioteca exportada."
+                )
+            )
+
 
     # ========================================================
-    # PRIMEIRO LOAD
+    # INITIAL LOAD
     # ========================================================
 
-    def initial_load(self):
+    def initial_load(
+        self
+    ):
+
+        self.update_integration_status_ui()
+
+        if not PLAYNITE_EXPORT_FILE.exists():
+
+            self.status_label.configure(
+                text=(
+                    "Aguardando sincronização "
+                    "com o Playnite."
+                )
+            )
+
+            return
 
         try:
-            games = read_playnite_export()
 
-            self.playnite_games = games
+            games = (
+                read_playnite_export()
+            )
+
+            self.playnite_games = (
+                games
+            )
 
             self.filtered_playnite_games = (
                 filter_playnite_games(
@@ -1367,47 +2007,12 @@ class WishlistApp(ctk.CTk):
                 )
             )
 
-            self.playnite_status_label.configure(
-                text=(
-                    f"Playnite: ✓ "
-                    f"{len(games)} jogos"
-                )
-            )
-
-            try:
-                size = (
-                    PLAYNITE_EXPORT_FILE
-                    .stat()
-                    .st_size
-                    /
-                    1024
-                )
-
-                self.file_status_label.configure(
-                    text=(
-                        f"Exportação Playnite\n"
-                        f"{size:.1f} KB"
-                    )
-                )
-
-            except Exception:
-                pass
-
             self.status_label.configure(
                 text=(
-                    "Playnite carregado. "
-                    "Clique em Atualizar dados "
-                    "para consultar a Steam."
+                    "Biblioteca do Playnite carregada. "
+                    "Clique em Atualizar dados."
                 )
             )
-
-        except FileNotFoundError:
-
-            self.playnite_status_label.configure(
-                text="Playnite: arquivo ausente"
-            )
-
-            self.show_sdk_instructions()
 
         except Exception as e:
 
@@ -1418,12 +2023,30 @@ class WishlistApp(ctk.CTk):
 
 
     # ========================================================
-    # ATUALIZAÇÃO
+    # REFRESH
     # ========================================================
 
-    def start_refresh(self):
+    def start_refresh(
+        self
+    ):
 
         if self.loading:
+            return
+
+        self.update_integration_status_ui()
+
+        if not PLAYNITE_EXPORT_FILE.exists():
+
+            messagebox.showwarning(
+                "Playnite",
+                (
+                    "A biblioteca do Playnite ainda "
+                    "não foi sincronizada.\n\n"
+                    "Abra ou reinicie o Playnite "
+                    "com o plugin instalado."
+                )
+            )
+
             return
 
         self.loading = True
@@ -1433,11 +2056,16 @@ class WishlistApp(ctk.CTk):
             text="Atualizando..."
         )
 
-        self.progress_bar.set(0)
+        self.progress_bar.set(
+            0
+        )
 
-        thread = threading.Thread(
-            target=self.refresh_worker,
-            daemon=True
+        thread = (
+            threading.Thread(
+                target=
+                    self.refresh_worker,
+                daemon=True
+            )
         )
 
         thread.start()
@@ -1447,12 +2075,11 @@ class WishlistApp(ctk.CTk):
     # WORKER
     # ========================================================
 
-    def refresh_worker(self):
+    def refresh_worker(
+        self
+    ):
 
         try:
-            # ------------------------------------------------
-            # PLAYNITE
-            # ------------------------------------------------
 
             self.event_queue.put(
                 (
@@ -1461,16 +2088,12 @@ class WishlistApp(ctk.CTk):
                 )
             )
 
-            games = read_playnite_export()
+            games = (
+                read_playnite_export()
+            )
 
             filtered_games = (
                 filter_playnite_games(
-                    games
-                )
-            )
-
-            source_counts = (
-                get_source_counts(
                     games
                 )
             )
@@ -1479,16 +2102,19 @@ class WishlistApp(ctk.CTk):
                 (
                     "playnite_loaded",
                     {
-                        "games": games,
-                        "filtered": filtered_games,
-                        "sources": source_counts
+                        "games":
+                            games,
+
+                        "filtered":
+                            filtered_games,
+
+                        "sources":
+                            get_source_counts(
+                                games
+                            )
                     }
                 )
             )
-
-            # ------------------------------------------------
-            # STEAM
-            # ------------------------------------------------
 
             self.event_queue.put(
                 (
@@ -1508,7 +2134,9 @@ class WishlistApp(ctk.CTk):
                 )
             )
 
-            total = len(appids)
+            total = (
+                len(appids)
+            )
 
             self.event_queue.put(
                 (
@@ -1521,11 +2149,10 @@ class WishlistApp(ctk.CTk):
 
             failures = 0
 
-            # ------------------------------------------------
-            # NOMES
-            # ------------------------------------------------
-
-            for index, appid in enumerate(
+            for (
+                index,
+                appid
+            ) in enumerate(
                 appids,
                 start=1
             ):
@@ -1538,11 +2165,13 @@ class WishlistApp(ctk.CTk):
                 )
 
                 if name:
+
                     wishlist[
                         name
                     ] = appid
 
                 else:
+
                     failures += 1
 
                 progress = (
@@ -1555,9 +2184,14 @@ class WishlistApp(ctk.CTk):
                     (
                         "progress",
                         {
-                            "value": progress,
-                            "current": index,
-                            "total": total
+                            "value":
+                                progress,
+
+                            "current":
+                                index,
+
+                            "total":
+                                total
                         }
                     )
                 )
@@ -1566,10 +2200,6 @@ class WishlistApp(ctk.CTk):
                     STEAM_APP_REQUEST_DELAY
                 )
 
-            # ------------------------------------------------
-            # MATCHING
-            # ------------------------------------------------
-
             self.event_queue.put(
                 (
                     "status",
@@ -1577,11 +2207,12 @@ class WishlistApp(ctk.CTk):
                 )
             )
 
-            exact, fuzzy = (
-                compare_games(
-                    wishlist,
-                    filtered_games
-                )
+            (
+                exact,
+                fuzzy
+            ) = compare_games(
+                wishlist,
+                filtered_games
             )
 
             matches = (
@@ -1594,12 +2225,23 @@ class WishlistApp(ctk.CTk):
                 (
                     "complete",
                     {
-                        "wishlist": wishlist,
-                        "wishlist_total": total,
-                        "failures": failures,
-                        "matches": matches,
-                        "exact": exact,
-                        "fuzzy": fuzzy
+                        "wishlist":
+                            wishlist,
+
+                        "wishlist_total":
+                            total,
+
+                        "failures":
+                            failures,
+
+                        "matches":
+                            matches,
+
+                        "exact":
+                            exact,
+
+                        "fuzzy":
+                            fuzzy
                     }
                 )
             )
@@ -1615,16 +2257,20 @@ class WishlistApp(ctk.CTk):
 
 
     # ========================================================
-    # PROCESSA FILA
+    # EVENT QUEUE
     # ========================================================
 
-    def process_event_queue(self):
+    def process_event_queue(
+        self
+    ):
 
         try:
+
             while True:
 
                 event, data = (
-                    self.event_queue.get_nowait()
+                    self.event_queue
+                    .get_nowait()
                 )
 
                 if event == "status":
@@ -1636,7 +2282,9 @@ class WishlistApp(ctk.CTk):
                 elif event == "progress":
 
                     self.progress_bar.set(
-                        data["value"]
+                        data[
+                            "value"
+                        ]
                     )
 
                     self.status_label.configure(
@@ -1649,30 +2297,34 @@ class WishlistApp(ctk.CTk):
 
                 elif event == "wishlist_total":
 
-                    self.total_wishlist_appids = data
-
-                    self.card_wishlist.configure(
-                        text=str(data)
+                    self.total_wishlist_appids = (
+                        data
                     )
 
-                    self.steam_status_label.configure(
-                        text=(
-                            f"Steam: {data} AppIDs"
+                    self.card_wishlist.configure(
+                        text=str(
+                            data
                         )
                     )
 
                 elif event == "playnite_loaded":
 
                     self.playnite_games = (
-                        data["games"]
+                        data[
+                            "games"
+                        ]
                     )
 
                     self.filtered_playnite_games = (
-                        data["filtered"]
+                        data[
+                            "filtered"
+                        ]
                     )
 
                     self.source_counts = (
-                        data["sources"]
+                        data[
+                            "sources"
+                        ]
                     )
 
                     self.card_playnite.configure(
@@ -1683,30 +2335,31 @@ class WishlistApp(ctk.CTk):
                         )
                     )
 
-                    self.playnite_status_label.configure(
-                        text=(
-                            "Playnite: ✓ "
-                            f"{len(self.playnite_games)} jogos"
-                        )
-                    )
-
                 elif event == "complete":
 
                     self.wishlist = (
-                        data["wishlist"]
+                        data[
+                            "wishlist"
+                        ]
                     )
 
                     self.failed_steam_names = (
-                        data["failures"]
+                        data[
+                            "failures"
+                        ]
                     )
 
                     self.matches = (
-                        data["matches"]
+                        data[
+                            "matches"
+                        ]
                     )
 
                     self.card_wishlist.configure(
                         text=str(
-                            data["wishlist_total"]
+                            data[
+                                "wishlist_total"
+                            ]
                         )
                     )
 
@@ -1736,7 +2389,9 @@ class WishlistApp(ctk.CTk):
 
                     self.apply_filters()
 
-                    self.progress_bar.set(1)
+                    self.progress_bar.set(
+                        1
+                    )
 
                     self.status_label.configure(
                         text=(
@@ -1753,6 +2408,8 @@ class WishlistApp(ctk.CTk):
                         text="Atualizar dados"
                     )
 
+                    self.update_integration_status_ui()
+
                 elif event == "error":
 
                     self.loading = False
@@ -1762,7 +2419,9 @@ class WishlistApp(ctk.CTk):
                         text="Atualizar dados"
                     )
 
-                    self.progress_bar.set(0)
+                    self.progress_bar.set(
+                        0
+                    )
 
                     self.status_label.configure(
                         text="Erro durante a atualização."
@@ -1783,18 +2442,25 @@ class WishlistApp(ctk.CTk):
 
 
     # ========================================================
-    # ATUALIZA FILTRO DE FONTES
+    # SOURCE FILTER
     # ========================================================
 
-    def update_source_filter(self):
+    def update_source_filter(
+        self
+    ):
 
         sources = sorted({
-            item["source"]
-            for item in self.matches
+            item[
+                "source"
+            ]
+            for item
+            in self.matches
         })
 
         values = (
-            ["Todas as bibliotecas"]
+            [
+                "Todas as bibliotecas"
+            ]
             +
             sources
         )
@@ -1809,10 +2475,12 @@ class WishlistApp(ctk.CTk):
 
 
     # ========================================================
-    # FILTROS
+    # FILTERS
     # ========================================================
 
-    def apply_filters(self):
+    def apply_filters(
+        self
+    ):
 
         search = (
             self.search_entry
@@ -1835,10 +2503,6 @@ class WishlistApp(ctk.CTk):
 
         for item in self.matches:
 
-            # ------------------------------------------------
-            # PESQUISA
-            # ------------------------------------------------
-
             if search:
 
                 haystack = (
@@ -1853,12 +2517,12 @@ class WishlistApp(ctk.CTk):
                     item["source"]
                 ).lower()
 
-                if search not in haystack:
+                if (
+                    search
+                    not in
+                    haystack
+                ):
                     continue
-
-            # ------------------------------------------------
-            # SOURCE
-            # ------------------------------------------------
 
             if (
                 source_filter
@@ -1873,11 +2537,11 @@ class WishlistApp(ctk.CTk):
                 ):
                     continue
 
-            # ------------------------------------------------
-            # MATCH
-            # ------------------------------------------------
-
-            if match_filter != "Todos":
+            if (
+                match_filter
+                !=
+                "Todos"
+            ):
 
                 if (
                     item["type"]
@@ -1886,7 +2550,9 @@ class WishlistApp(ctk.CTk):
                 ):
                     continue
 
-            filtered.append(item)
+            filtered.append(
+                item
+            )
 
         self.populate_table(
             filtered
@@ -1894,14 +2560,15 @@ class WishlistApp(ctk.CTk):
 
         self.result_count_label.configure(
             text=(
-                f"{len(filtered)} resultado(s) exibido(s) "
-                f"de {len(self.matches)} encontrado(s)."
+                f"{len(filtered)} resultado(s) "
+                f"exibido(s) de "
+                f"{len(self.matches)} encontrado(s)."
             )
         )
 
 
     # ========================================================
-    # POPULA TABELA
+    # TABLE
     # ========================================================
 
     def populate_table(
@@ -1909,7 +2576,9 @@ class WishlistApp(ctk.CTk):
         matches
     ):
 
-        for row in self.tree.get_children():
+        for row in (
+            self.tree.get_children()
+        ):
 
             self.tree.delete(
                 row
@@ -1921,20 +2590,36 @@ class WishlistApp(ctk.CTk):
                 "",
                 "end",
                 values=(
-                    item["wishlist"],
-                    item["playnite"],
-                    item["source"],
-                    item["type"],
-                    f"{item['score']:.1f}%"
+                    item[
+                        "wishlist"
+                    ],
+
+                    item[
+                        "playnite"
+                    ],
+
+                    item[
+                        "source"
+                    ],
+
+                    item[
+                        "type"
+                    ],
+
+                    (
+                        f"{item['score']:.1f}%"
+                    )
                 ),
                 tags=(
-                    item["appid"],
+                    item[
+                        "appid"
+                    ],
                 )
             )
 
 
     # ========================================================
-    # ABRE PÁGINA STEAM
+    # STEAM PAGE
     # ========================================================
 
     def open_selected_steam_page(
@@ -1949,56 +2634,70 @@ class WishlistApp(ctk.CTk):
         if not selected:
             return
 
-        item_id = selected[0]
+        item_id = (
+            selected[0]
+        )
 
-        tags = self.tree.item(
-            item_id,
-            "tags"
+        tags = (
+            self.tree.item(
+                item_id,
+                "tags"
+            )
         )
 
         if not tags:
             return
 
-        appid = tags[0]
+        appid = (
+            tags[0]
+        )
 
-        url = (
+        webbrowser.open(
             "https://store.steampowered.com/"
             f"app/{appid}/"
         )
 
-        webbrowser.open(url)
-
 
     # ========================================================
-    # INSTRUÇÕES SDK
+    # INTEGRATION DIALOG
     # ========================================================
 
-    def show_sdk_instructions(self):
+    def show_integration_info(
+        self
+    ):
 
-        dialog = ctk.CTkToplevel(
-            self
+        self.update_integration_status_ui()
+
+        status = (
+            self.integration_status
+        )
+
+        dialog = (
+            ctk.CTkToplevel(
+                self
+            )
         )
 
         dialog.title(
-            "Atualizar biblioteca do Playnite"
+            "Integração com Playnite"
         )
 
         dialog.geometry(
-            "800x500"
+            "720x510"
         )
 
         dialog.transient(
             self
         )
 
-        title = ctk.CTkLabel(
-            dialog,
-            text=(
-                "Atualização manual do Playnite"
-            ),
-            font=ctk.CTkFont(
-                size=22,
-                weight="bold"
+        title = (
+            ctk.CTkLabel(
+                dialog,
+                text="Integração com Playnite",
+                font=ctk.CTkFont(
+                    size=22,
+                    weight="bold"
+                )
             )
         )
 
@@ -2007,119 +2706,116 @@ class WishlistApp(ctk.CTk):
             padx=25,
             pady=(
                 25,
-                10
-            )
-        )
-
-        instructions = ctk.CTkLabel(
-            dialog,
-            text=(
-                "1. Abra o Playnite.\n"
-                "2. Vá em Extensões → SDK Interativo PowerShell.\n"
-                "3. Use Ctrl+V e Enter para inicializar "
-                "$PlayniteApi.\n"
-                "4. Execute o comando abaixo.\n"
-                "5. Volte ao aplicativo e clique em "
-                "\"Atualizar dados\"."
-            ),
-            justify="left",
-            anchor="w"
-        )
-
-        instructions.pack(
-            fill="x",
-            padx=25,
-            pady=(
-                0,
                 15
             )
         )
 
-        textbox = ctk.CTkTextbox(
-            dialog,
-            height=220,
-            wrap="word"
-        )
+        if status[
+            "plugin_installed"
+        ]:
 
-        textbox.pack(
-            fill="both",
-            expand=True,
-            padx=25,
-            pady=(
-                0,
-                15
+            plugin_text = (
+                "✓ Plugin instalado"
+            )
+
+        else:
+
+            plugin_text = (
+                "✕ Plugin não encontrado"
+            )
+
+        if status[
+            "export_exists"
+        ]:
+
+            export_text = (
+                "✓ Biblioteca sincronizada"
+            )
+
+        else:
+
+            export_text = (
+                "✕ Biblioteca não sincronizada"
+            )
+
+        info = (
+            ctk.CTkLabel(
+                dialog,
+                text=(
+                    f"{plugin_text}\n"
+                    f"{export_text}\n\n"
+                    "Última sincronização:\n"
+                    f"{format_datetime(status['export_modified'])}\n\n"
+                    "Plugin esperado em:\n"
+                    f"{PLAYNITE_PLUGIN_DIR}\n\n"
+                    "Biblioteca exportada:\n"
+                    f"{PLAYNITE_EXPORT_FILE}"
+                ),
+                justify="left",
+                anchor="w",
+                wraplength=650
             )
         )
 
-        textbox.insert(
-            "1.0",
-            PLAYNITE_EXPORT_COMMAND
-        )
-
-        textbox.configure(
-            state="disabled"
-        )
-
-        button_frame = ctk.CTkFrame(
-            dialog,
-            fg_color="transparent"
-        )
-
-        button_frame.pack(
+        info.pack(
             fill="x",
             padx=25,
-            pady=(
-                0,
-                25
+            pady=10
+        )
+
+        refresh_button = (
+            ctk.CTkButton(
+                dialog,
+                text="Verificar novamente",
+                command=lambda:
+                    self.refresh_integration_dialog(
+                        dialog
+                    )
             )
         )
 
-        copy_button = ctk.CTkButton(
-            button_frame,
-            text="Copiar comando",
-            command=lambda:
-                self.copy_sdk_command()
+        refresh_button.pack(
+            side="left",
+            padx=25,
+            pady=25
         )
 
-        copy_button.pack(
-            side="left"
-        )
-
-        close_button = ctk.CTkButton(
-            button_frame,
-            text="Fechar",
-            fg_color="transparent",
-            border_width=1,
-            command=dialog.destroy
+        close_button = (
+            ctk.CTkButton(
+                dialog,
+                text="Fechar",
+                fg_color="transparent",
+                border_width=1,
+                command=
+                    dialog.destroy
+            )
         )
 
         close_button.pack(
-            side="right"
+            side="right",
+            padx=25,
+            pady=25
         )
 
 
     # ========================================================
-    # COPIA COMANDO
+    # REFRESH DIALOG
     # ========================================================
 
-    def copy_sdk_command(self):
+    def refresh_integration_dialog(
+        self,
+        dialog
+    ):
 
-        self.clipboard_clear()
+        self.update_integration_status_ui()
 
-        self.clipboard_append(
-            PLAYNITE_EXPORT_COMMAND
-        )
+        dialog.destroy()
 
-        self.update()
-
-        messagebox.showinfo(
-            "Copiado",
-            "Comando copiado para a área de transferência."
-        )
+        self.show_integration_info()
 
 
 # ============================================================
-# EXECUÇÃO
+# RUN
 # ============================================================
 
 if __name__ == "__main__":
