@@ -24,10 +24,8 @@ APP_VERSION = "1.1.0"
 
 
 # ============================================================
-# CONFIGURAÇÕES
+# CONFIGURAÇÕES GERAIS
 # ============================================================
-
-STEAM_ID_64 = "76561198349875986"
 
 FUZZY_SCORE_CUTOFF = 85
 
@@ -52,6 +50,27 @@ LOCALAPPDATA = Path(
     )
 )
 
+
+# ------------------------------------------------------------
+# CONFIG DO NOSSO APP
+# ------------------------------------------------------------
+
+APP_CONFIG_DIR = (
+    APPDATA
+    /
+    "WishlistSteamCheck"
+)
+
+APP_CONFIG_FILE = (
+    APP_CONFIG_DIR
+    /
+    "config.json"
+)
+
+
+# ------------------------------------------------------------
+# PLAYNITE
+# ------------------------------------------------------------
 
 PLAYNITE_DATA_DIR = (
     APPDATA
@@ -100,6 +119,105 @@ PLAYNITE_EXE = (
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
+
+
+# ============================================================
+# CONFIGURAÇÃO DO APP
+# ============================================================
+
+def load_config():
+    """
+    Lê configurações persistentes do usuário.
+    """
+
+    default_config = {
+        "steam_id_64": ""
+    }
+
+    if not APP_CONFIG_FILE.exists():
+        return default_config
+
+    try:
+        with APP_CONFIG_FILE.open(
+            "r",
+            encoding="utf-8"
+        ) as f:
+
+            data = json.load(f)
+
+        if not isinstance(
+            data,
+            dict
+        ):
+            return default_config
+
+        return {
+            "steam_id_64":
+                str(
+                    data.get(
+                        "steam_id_64",
+                        ""
+                    )
+                    or
+                    ""
+                ).strip()
+        }
+
+    except Exception:
+        return default_config
+
+
+def save_config(config):
+    """
+    Salva configurações em AppData.
+    """
+
+    APP_CONFIG_DIR.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    with APP_CONFIG_FILE.open(
+        "w",
+        encoding="utf-8"
+    ) as f:
+
+        json.dump(
+            config,
+            f,
+            ensure_ascii=False,
+            indent=4
+        )
+
+
+# ============================================================
+# VALIDAÇÃO DO STEAMID64
+# ============================================================
+
+def is_valid_steam_id_64(value):
+    """
+    Validação básica de SteamID64.
+
+    SteamID64 é um número inteiro normalmente
+    com 17 dígitos e começa com 7656119.
+    """
+
+    value = str(
+        value
+    ).strip()
+
+    if not value.isdigit():
+        return False
+
+    if len(value) != 17:
+        return False
+
+    if not value.startswith(
+        "7656119"
+    ):
+        return False
+
+    return True
 
 
 # ============================================================
@@ -169,15 +287,10 @@ def is_playnite_running():
 
 
 # ============================================================
-# PLAYNITE - STATUS DA INTEGRAÇÃO
+# PLAYNITE - STATUS
 # ============================================================
 
 def get_playnite_integration_status():
-    """
-    Retorna um resumo da integração Playnite.
-
-    Não usa SDK Interativo.
-    """
 
     playnite_installed = (
         PLAYNITE_EXE.exists()
@@ -261,10 +374,11 @@ def get_playnite_integration_status():
 
 
 # ============================================================
-# FORMATA DATA
+# DATA
 # ============================================================
 
 def format_datetime(value):
+
     if not value:
         return "—"
 
@@ -273,18 +387,13 @@ def format_datetime(value):
     )
 
 
-# ============================================================
-# TEMPO DESDE A SINCRONIZAÇÃO
-# ============================================================
-
 def format_age(value):
+
     if not value:
         return "Nunca"
 
-    now = datetime.now()
-
     delta = (
-        now
+        datetime.now()
         -
         value
     )
@@ -297,10 +406,7 @@ def format_age(value):
     )
 
     if seconds < 60:
-
-        return (
-            "há menos de 1 minuto"
-        )
+        return "há menos de 1 minuto"
 
     minutes = (
         seconds // 60
@@ -341,10 +447,11 @@ def format_age(value):
 
 
 # ============================================================
-# PLAYNITE - LÊ JSON
+# PLAYNITE - LEITURA
 # ============================================================
 
 def read_playnite_export():
+
     if not PLAYNITE_EXPORT_FILE.exists():
 
         raise FileNotFoundError(
@@ -471,12 +578,11 @@ def read_playnite_export():
 
 
 # ============================================================
-# FONTES
+# PLAYNITE - FONTES
 # ============================================================
 
-def get_source_counts(
-    games
-):
+def get_source_counts(games):
+
     counts = {}
 
     for game in games:
@@ -501,13 +607,7 @@ def get_source_counts(
     return counts
 
 
-# ============================================================
-# FILTRO PLAYNITE
-# ============================================================
-
-def filter_playnite_games(
-    games
-):
+def filter_playnite_games(games):
 
     if not IGNORE_STEAM_SOURCE:
         return games
@@ -535,7 +635,7 @@ def filter_playnite_games(
 
 
 # ============================================================
-# STEAM SESSION
+# STEAM
 # ============================================================
 
 def create_steam_session():
@@ -564,7 +664,7 @@ def create_steam_session():
 
 
 # ============================================================
-# STEAM WISHLIST
+# STEAM - WISHLIST
 # ============================================================
 
 def get_steam_wishlist_appids(
@@ -652,7 +752,7 @@ def get_steam_wishlist_appids(
 
 
 # ============================================================
-# STEAM APP NAME
+# STEAM - APP DETAILS
 # ============================================================
 
 def get_steam_app_name(
@@ -739,7 +839,7 @@ def get_steam_app_name(
 
 
 # ============================================================
-# MATCH
+# COMPARAÇÃO
 # ============================================================
 
 def compare_games(
@@ -915,7 +1015,16 @@ class WishlistApp(
 ):
 
     def __init__(self):
+
         super().__init__()
+
+        # ----------------------------------------------------
+        # CONFIG
+        # ----------------------------------------------------
+
+        self.config_data = (
+            load_config()
+        )
 
         # ----------------------------------------------------
         # JANELA
@@ -979,6 +1088,10 @@ class WishlistApp(
             weight=1
         )
 
+        # ----------------------------------------------------
+        # GUI
+        # ----------------------------------------------------
+
         self.create_sidebar()
 
         self.create_main_area()
@@ -1022,14 +1135,20 @@ class WishlistApp(
             False
         )
 
-        title = ctk.CTkLabel(
-            self.sidebar,
-            text="Wishlist\nChecker",
-            font=ctk.CTkFont(
-                size=27,
-                weight="bold"
-            ),
-            justify="left"
+        # ----------------------------------------------------
+        # TÍTULO
+        # ----------------------------------------------------
+
+        title = (
+            ctk.CTkLabel(
+                self.sidebar,
+                text="Wishlist\nChecker",
+                font=ctk.CTkFont(
+                    size=27,
+                    weight="bold"
+                ),
+                justify="left"
+            )
         )
 
         title.pack(
@@ -1041,13 +1160,15 @@ class WishlistApp(
             )
         )
 
-        subtitle = ctk.CTkLabel(
-            self.sidebar,
-            text="Steam × Playnite",
-            font=ctk.CTkFont(
-                size=14
-            ),
-            text_color="gray70"
+        subtitle = (
+            ctk.CTkLabel(
+                self.sidebar,
+                text="Steam × Playnite",
+                font=ctk.CTkFont(
+                    size=14
+                ),
+                text_color="gray70"
+            )
         )
 
         subtitle.pack(
@@ -1096,6 +1217,28 @@ class WishlistApp(
         )
 
         self.refresh_button.pack(
+            fill="x",
+            padx=20,
+            pady=8
+        )
+
+        # ----------------------------------------------------
+        # CONTA STEAM
+        # ----------------------------------------------------
+
+        steam_button = (
+            ctk.CTkButton(
+                self.sidebar,
+                text="Conta Steam",
+                height=40,
+                fg_color="transparent",
+                border_width=1,
+                command=
+                    self.show_steam_settings
+            )
+        )
+
+        steam_button.pack(
             fill="x",
             padx=20,
             pady=8
@@ -1153,7 +1296,7 @@ class WishlistApp(
         )
 
         # ----------------------------------------------------
-        # PLAYNITE STATUS
+        # PLAYNITE
         # ----------------------------------------------------
 
         self.playnite_status_label = (
@@ -1196,7 +1339,7 @@ class WishlistApp(
         )
 
         # ----------------------------------------------------
-        # SINCRONIZAÇÃO
+        # BIBLIOTECA
         # ----------------------------------------------------
 
         self.sync_status_label = (
@@ -1239,7 +1382,7 @@ class WishlistApp(
         )
 
         # ----------------------------------------------------
-        # DETALHES JSON
+        # JSON
         # ----------------------------------------------------
 
         self.file_status_label = (
@@ -1267,7 +1410,7 @@ class WishlistApp(
 
 
     # ========================================================
-    # CONTEÚDO
+    # CONTEÚDO PRINCIPAL
     # ========================================================
 
     def create_main_area(
@@ -1493,7 +1636,7 @@ class WishlistApp(
         )
 
         # ----------------------------------------------------
-        # RESULT COUNT
+        # CONTAGEM
         # ----------------------------------------------------
 
         self.result_count_label = (
@@ -1842,7 +1985,51 @@ class WishlistApp(
 
 
     # ========================================================
-    # ATUALIZA STATUS PLAYNITE
+    # STATUS STEAM
+    # ========================================================
+
+    def update_steam_account_status(
+        self
+    ):
+
+        steam_id = (
+            self.config_data
+            .get(
+                "steam_id_64",
+                ""
+            )
+        )
+
+        if is_valid_steam_id_64(
+            steam_id
+        ):
+
+            masked = (
+                steam_id[:7]
+                +
+                "••••••"
+                +
+                steam_id[-4:]
+            )
+
+            self.steam_status_label.configure(
+                text=(
+                    "Steam: ✓ configurada\n"
+                    f"{masked}"
+                )
+            )
+
+        else:
+
+            self.steam_status_label.configure(
+                text=(
+                    "Steam: ✕ não configurada"
+                )
+            )
+
+
+    # ========================================================
+    # STATUS PLAYNITE
     # ========================================================
 
     def update_integration_status_ui(
@@ -1856,10 +2043,6 @@ class WishlistApp(
         self.integration_status = (
             status
         )
-
-        # ----------------------------------------------------
-        # PLAYNITE
-        # ----------------------------------------------------
 
         if not status[
             "playnite_installed"
@@ -1883,10 +2066,6 @@ class WishlistApp(
                 text="Playnite: ✓ instalado"
             )
 
-        # ----------------------------------------------------
-        # PLUGIN
-        # ----------------------------------------------------
-
         if status[
             "plugin_installed"
         ]:
@@ -1900,10 +2079,6 @@ class WishlistApp(
             self.plugin_status_label.configure(
                 text="Plugin: ✕ não encontrado"
             )
-
-        # ----------------------------------------------------
-        # EXPORTAÇÃO
-        # ----------------------------------------------------
 
         if status[
             "export_exists"
@@ -1968,6 +2143,8 @@ class WishlistApp(
 
         self.update_integration_status_ui()
 
+        self.update_steam_account_status()
+
         if not PLAYNITE_EXPORT_FILE.exists():
 
             self.status_label.configure(
@@ -2007,12 +2184,28 @@ class WishlistApp(
                 )
             )
 
-            self.status_label.configure(
-                text=(
-                    "Biblioteca do Playnite carregada. "
-                    "Clique em Atualizar dados."
+            if not is_valid_steam_id_64(
+                self.config_data.get(
+                    "steam_id_64",
+                    ""
                 )
-            )
+            ):
+
+                self.status_label.configure(
+                    text=(
+                        "Configure sua conta Steam "
+                        "para continuar."
+                    )
+                )
+
+            else:
+
+                self.status_label.configure(
+                    text=(
+                        "Biblioteca do Playnite carregada. "
+                        "Clique em Atualizar dados."
+                    )
+                )
 
         except Exception as e:
 
@@ -2020,6 +2213,258 @@ class WishlistApp(
                 "Erro no Playnite",
                 str(e)
             )
+
+
+    # ========================================================
+    # STEAM SETTINGS
+    # ========================================================
+
+    def show_steam_settings(
+        self
+    ):
+
+        dialog = (
+            ctk.CTkToplevel(
+                self
+            )
+        )
+
+        dialog.title(
+            "Conta Steam"
+        )
+
+        dialog.geometry(
+            "570x340"
+        )
+
+        dialog.resizable(
+            False,
+            False
+        )
+
+        dialog.transient(
+            self
+        )
+
+        dialog.grab_set()
+
+        title = (
+            ctk.CTkLabel(
+                dialog,
+                text="Conta Steam",
+                font=ctk.CTkFont(
+                    size=22,
+                    weight="bold"
+                )
+            )
+        )
+
+        title.pack(
+            anchor="w",
+            padx=25,
+            pady=(
+                25,
+                5
+            )
+        )
+
+        description = (
+            ctk.CTkLabel(
+                dialog,
+                text=(
+                    "Informe o seu SteamID64.\n"
+                    "Ele será salvo somente neste computador."
+                ),
+                justify="left",
+                text_color="gray70"
+            )
+        )
+
+        description.pack(
+            anchor="w",
+            padx=25,
+            pady=(
+                0,
+                20
+            )
+        )
+
+        steam_id_label = (
+            ctk.CTkLabel(
+                dialog,
+                text="SteamID64"
+            )
+        )
+
+        steam_id_label.pack(
+            anchor="w",
+            padx=25,
+            pady=(
+                0,
+                5
+            )
+        )
+
+        steam_id_entry = (
+            ctk.CTkEntry(
+                dialog,
+                height=40,
+                placeholder_text=
+                    "7656119XXXXXXXXXX"
+            )
+        )
+
+        steam_id_entry.pack(
+            fill="x",
+            padx=25
+        )
+
+        current_steam_id = (
+            self.config_data.get(
+                "steam_id_64",
+                ""
+            )
+        )
+
+        if current_steam_id:
+
+            steam_id_entry.insert(
+                0,
+                current_steam_id
+            )
+
+        help_label = (
+            ctk.CTkLabel(
+                dialog,
+                text=(
+                    "Exemplo: 76561198349875986"
+                ),
+                text_color="gray55",
+                font=ctk.CTkFont(
+                    size=11
+                )
+            )
+        )
+
+        help_label.pack(
+            anchor="w",
+            padx=25,
+            pady=(
+                6,
+                0
+            )
+        )
+
+        button_frame = (
+            ctk.CTkFrame(
+                dialog,
+                fg_color="transparent"
+            )
+        )
+
+        button_frame.pack(
+            fill="x",
+            padx=25,
+            pady=25
+        )
+
+        save_button = (
+            ctk.CTkButton(
+                button_frame,
+                text="Salvar",
+                command=lambda:
+                    self.save_steam_settings(
+                        dialog,
+                        steam_id_entry
+                    )
+            )
+        )
+
+        save_button.pack(
+            side="left"
+        )
+
+        cancel_button = (
+            ctk.CTkButton(
+                button_frame,
+                text="Cancelar",
+                fg_color="transparent",
+                border_width=1,
+                command=
+                    dialog.destroy
+            )
+        )
+
+        cancel_button.pack(
+            side="right"
+        )
+
+
+    # ========================================================
+    # SAVE STEAM SETTINGS
+    # ========================================================
+
+    def save_steam_settings(
+        self,
+        dialog,
+        entry
+    ):
+
+        steam_id = (
+            entry
+            .get()
+            .strip()
+        )
+
+        if not is_valid_steam_id_64(
+            steam_id
+        ):
+
+            messagebox.showerror(
+                "SteamID64 inválido",
+                (
+                    "Informe um SteamID64 válido.\n\n"
+                    "Ele deve conter 17 números."
+                ),
+                parent=dialog
+            )
+
+            return
+
+        self.config_data[
+            "steam_id_64"
+        ] = steam_id
+
+        try:
+
+            save_config(
+                self.config_data
+            )
+
+        except Exception as e:
+
+            messagebox.showerror(
+                "Erro",
+                (
+                    "Não foi possível salvar "
+                    "a configuração.\n\n"
+                    f"{e}"
+                ),
+                parent=dialog
+            )
+
+            return
+
+        self.update_steam_account_status()
+
+        self.status_label.configure(
+            text=(
+                "Conta Steam configurada. "
+                "Clique em Atualizar dados."
+            )
+        )
+
+        dialog.destroy()
 
 
     # ========================================================
@@ -2035,6 +2480,38 @@ class WishlistApp(
 
         self.update_integration_status_ui()
 
+        steam_id = (
+            self.config_data
+            .get(
+                "steam_id_64",
+                ""
+            )
+        )
+
+        # ----------------------------------------------------
+        # CONTA STEAM
+        # ----------------------------------------------------
+
+        if not is_valid_steam_id_64(
+            steam_id
+        ):
+
+            messagebox.showwarning(
+                "Conta Steam",
+                (
+                    "Configure seu SteamID64 "
+                    "antes de atualizar os dados."
+                )
+            )
+
+            self.show_steam_settings()
+
+            return
+
+        # ----------------------------------------------------
+        # PLAYNITE
+        # ----------------------------------------------------
+
         if not PLAYNITE_EXPORT_FILE.exists():
 
             messagebox.showwarning(
@@ -2048,6 +2525,10 @@ class WishlistApp(
             )
 
             return
+
+        # ----------------------------------------------------
+        # INICIA
+        # ----------------------------------------------------
 
         self.loading = True
 
@@ -2080,6 +2561,16 @@ class WishlistApp(
     ):
 
         try:
+
+            steam_id = (
+                self.config_data[
+                    "steam_id_64"
+                ]
+            )
+
+            # ------------------------------------------------
+            # PLAYNITE
+            # ------------------------------------------------
 
             self.event_queue.put(
                 (
@@ -2116,6 +2607,10 @@ class WishlistApp(
                 )
             )
 
+            # ------------------------------------------------
+            # STEAM
+            # ------------------------------------------------
+
             self.event_queue.put(
                 (
                     "status",
@@ -2129,7 +2624,7 @@ class WishlistApp(
 
             appids = (
                 get_steam_wishlist_appids(
-                    STEAM_ID_64,
+                    steam_id,
                     session
                 )
             )
@@ -2148,6 +2643,10 @@ class WishlistApp(
             wishlist = {}
 
             failures = 0
+
+            # ------------------------------------------------
+            # NOMES
+            # ------------------------------------------------
 
             for (
                 index,
@@ -2199,6 +2698,10 @@ class WishlistApp(
                 time.sleep(
                     STEAM_APP_REQUEST_DELAY
                 )
+
+            # ------------------------------------------------
+            # COMPARAÇÃO
+            # ------------------------------------------------
 
             self.event_queue.put(
                 (
@@ -2424,7 +2927,9 @@ class WishlistApp(
                     )
 
                     self.status_label.configure(
-                        text="Erro durante a atualização."
+                        text=(
+                            "Erro durante a atualização."
+                        )
                     )
 
                     messagebox.showerror(
@@ -2442,7 +2947,7 @@ class WishlistApp(
 
 
     # ========================================================
-    # SOURCE FILTER
+    # FILTRO DE FONTES
     # ========================================================
 
     def update_source_filter(
@@ -2475,7 +2980,7 @@ class WishlistApp(
 
 
     # ========================================================
-    # FILTERS
+    # FILTROS
     # ========================================================
 
     def apply_filters(
@@ -2568,7 +3073,7 @@ class WishlistApp(
 
 
     # ========================================================
-    # TABLE
+    # TABELA
     # ========================================================
 
     def populate_table(
@@ -2619,7 +3124,7 @@ class WishlistApp(
 
 
     # ========================================================
-    # STEAM PAGE
+    # PÁGINA STEAM
     # ========================================================
 
     def open_selected_steam_page(
@@ -2659,7 +3164,7 @@ class WishlistApp(
 
 
     # ========================================================
-    # INTEGRATION DIALOG
+    # INTEGRAÇÃO PLAYNITE
     # ========================================================
 
     def show_integration_info(
@@ -2798,10 +3303,6 @@ class WishlistApp(
         )
 
 
-    # ========================================================
-    # REFRESH DIALOG
-    # ========================================================
-
     def refresh_integration_dialog(
         self,
         dialog
@@ -2815,7 +3316,7 @@ class WishlistApp(
 
 
 # ============================================================
-# RUN
+# EXECUÇÃO
 # ============================================================
 
 if __name__ == "__main__":
