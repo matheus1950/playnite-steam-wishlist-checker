@@ -1,0 +1,7 @@
+﻿Id: SteamWishlistExporter_f69bad44-bb27-4d8c-b6ae-fac43d72aa4d
+Name: Steam Wishlist Exporter
+Author: Matheus
+Version: 1.0
+Module: SteamWishlistExporter.dll
+Type: GenericPlugin
+Icon: icon.png
