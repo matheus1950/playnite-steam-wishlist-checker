@@ -1,22 +1,40 @@
-Primeiro Commit.
+# Steam Wishlist × Playnite
 
+Aplicativo para identificar jogos da sua wishlist da Steam que você já possui em outras bibliotecas cadastradas no Playnite, como Epic Games, GOG, Amazon Games, Xbox, EA app, Battle.net e outras.
 
-Script SDK playnite:
+## Funcionalidades
 
+- Interface gráfica em modo escuro
+- Leitura automática da biblioteca do Playnite
+- Integração com Playnite por plugin próprio
+- Instalação do plugin diretamente pela interface
+- Configuração persistente do SteamID64
+- Comparação entre wishlist da Steam e biblioteca do Playnite
+- Ignora jogos da própria biblioteca Steam
+- Exibe a biblioteca em que o jogo foi encontrado
+- Match exato e aproximado
+- Filtro por biblioteca
+- Filtro por tipo de correspondência
+- Pesquisa por nome
+- Duplo clique para abrir a página do jogo na Steam
+- Executável standalone para Windows
 
-        Connected to Playnite process.
-        Use CTLR-V and ENTER to paste commands to initialize basic SDK variables.
-        More information at:
-        https://playnite.link/docs/master/tutorials/extensions/scriptingDebugging.html
+## Requisitos
 
-[Processo:24444]: PS C:\Users\mathe\OneDrive\Documentos> $PlayniteRunspace = Get-Runspace -Name 'PSInteractive'
-[Processo:24444]: PS C:\Users\mathe\OneDrive\Documentos> $PlayniteApi = $PlayniteRunspace.SessionStateProxy.GetVariable('PlayniteApi')
-[Processo:24444]: PS C:\Users\mathe\OneDrive\Documentos> $PlayniteApi.Database.Games.Count
-1905
-[Processo:24444]: PS C:\Users\mathe\OneDrive\Documentos> $PlayniteApi.Database.Games | ForEach-Object { [PSCustomObject]@{ Name=$_.Name; Source=if ($_.Source) {$_.Source.Name} else {""}; PluginId="$($_.PluginId)"; GameId="$($_.GameId)"; IsInstalled=$_.IsInstalled; Hidden=$_.Hidden } } | ConvertTo-Json -Depth 4 | Set-Content "$env:APPDATA\Playnite\steam_wishlist_checker_library.json" -Encoding UTF8
-[Processo:24444]: PS C:\Users\mathe\OneDrive\Documentos>
+Para usar a versão distribuída:
 
+- Windows
+- Playnite instalado
+- Conta Steam com wishlist acessível
+- Conexão com a internet
 
-Imagem exemplo de funcionamento:
-<img width="1574" height="1013" alt="image" src="https://github.com/user-attachments/assets/6da84aa4-03b0-4d3e-994e-e617a2ca0d29" />
+Não é necessário instalar Python, Visual Studio ou utilizar o SDK Interativo do Playnite.
 
+## Download
+
+Baixe a versão mais recente na seção **Releases** do GitHub.
+
+Extraia o arquivo ZIP para uma pasta de sua preferência e execute:
+
+```text
+WishlistSteamCheck.exe
