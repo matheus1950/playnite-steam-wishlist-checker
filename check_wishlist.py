@@ -96,6 +96,18 @@ RESOURCE_BASE_DIR = (
     get_resource_base_dir()
 )
 
+ASSETS_DIR = (
+    RESOURCE_BASE_DIR
+    /
+    "assets"
+)
+
+APP_ICON = (
+    ASSETS_DIR
+    /
+    "app.ico"
+)
+
 BUNDLED_PLUGIN_DIR = (
     RESOURCE_BASE_DIR
     /
@@ -1208,6 +1220,14 @@ class WishlistApp(
         self.title(
             APP_NAME
         )
+        
+        try:
+            if APP_ICON.exists():
+                self.iconbitmap(
+                    str(APP_ICON)
+                )
+        except Exception:
+            pass        
 
         self.geometry(
             "1280x800"

@@ -5,7 +5,10 @@ a = Analysis(
     ['check_wishlist.py'],
     pathex=[],
     binaries=[],
-    datas=[('resources', 'resources')],
+    datas=[
+        ('resources', 'resources'),
+        ('assets', 'assets'),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -14,6 +17,7 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
@@ -32,7 +36,9 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon='assets/app.ico',
 )
+
 coll = COLLECT(
     exe,
     a.binaries,
