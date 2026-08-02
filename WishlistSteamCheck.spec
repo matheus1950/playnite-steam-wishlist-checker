@@ -8,6 +8,7 @@ a = Analysis(
     datas=[
         ('resources', 'resources'),
         ('assets', 'assets'),
+	('locales', 'locales'),
     ],
     hiddenimports=[],
     hookspath=[],

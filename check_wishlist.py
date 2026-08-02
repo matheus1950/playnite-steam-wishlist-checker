@@ -23,7 +23,7 @@ from rapidfuzz import process, fuzz
 # ============================================================
 
 APP_NAME = "Steam Wishlist × Playnite"
-APP_VERSION = "1.2.2"
+APP_VERSION = "1.3.0"
 
 
 # ============================================================
@@ -97,6 +97,12 @@ RESOURCE_BASE_DIR = (
     get_resource_base_dir()
 )
 
+LOCALES_DIR = (
+    RESOURCE_BASE_DIR
+    /
+    "locales"
+)
+
 ASSETS_DIR = (
     RESOURCE_BASE_DIR
     /
@@ -135,6 +141,62 @@ BUNDLED_PLUGIN_MANIFEST = (
     "extension.yaml"
 )
 
+TRANSLATIONS = {}
+
+
+def load_translations(
+    language_code
+):
+    global TRANSLATIONS
+
+    language_file = (
+        LOCALES_DIR
+        /
+        f"{language_code}.json"
+    )
+
+    if not language_file.exists():
+        raise FileNotFoundError(
+            f"Arquivo de idioma não encontrado: {language_file}"
+        )
+
+    with language_file.open(
+        "r",
+        encoding="utf-8"
+    ) as f:
+        TRANSLATIONS = json.load(f)
+
+
+def t(
+    key,
+    **kwargs
+):
+    text = TRANSLATIONS.get(
+        key,
+        key
+    )
+
+    if kwargs:
+        try:
+            return text.format(
+                **kwargs
+            )
+        except Exception:
+            return text
+
+    return text
+
+
+LANGUAGE_LABELS = {
+    "pt_BR": "Português (Brasil)",
+    "en_US": "English"
+}
+
+LANGUAGE_CODES = {
+    label: code
+    for code, label
+    in LANGUAGE_LABELS.items()
+}
 
 # ============================================================
 # CONFIGURAÇÃO DO NOSSO APP
@@ -249,7 +311,8 @@ COLOR_DANGER = "#E46C6C"
 
 def load_config():
     default_config = {
-        "steam_id_64": ""
+        "steam_id_64": "",
+        "language": "en_US"
     }
 
     if not APP_CONFIG_FILE.exists():
@@ -281,6 +344,16 @@ def load_config():
                     )
                     or
                     ""
+                ).strip(),
+
+            "language":
+                str(
+                    data.get(
+                        "language",
+                        "en_US"
+                    )
+                    or
+                    "en_US"
                 ).strip()
         }
 
@@ -443,10 +516,10 @@ def install_playnite_plugin():
     if not bundled_plugin_available():
 
         raise FileNotFoundError(
-            "Os arquivos do plugin Playnite não foram "
-            "encontrados dentro do aplicativo.\n\n"
-            "Pasta esperada:\n"
-            f"{BUNDLED_PLUGIN_DIR}"
+            t(
+                "plugin_files_missing",
+                path=BUNDLED_PLUGIN_DIR
+            )
         )
 
     PLAYNITE_EXTENSIONS_DIR.mkdir(
@@ -469,10 +542,10 @@ def install_playnite_plugin():
         except Exception as e:
 
             raise RuntimeError(
-                "Não foi possível substituir a instalação "
-                "atual do plugin.\n\n"
-                "Feche o Playnite e tente novamente.\n\n"
-                f"Detalhes: {e}"
+                t(
+                    "plugin_replace_error",
+                    details=e
+                )
             )
 
     # --------------------------------------------------------
@@ -489,8 +562,10 @@ def install_playnite_plugin():
     except Exception as e:
 
         raise RuntimeError(
-            "Não foi possível instalar o plugin do Playnite.\n\n"
-            f"{e}"
+            t(
+                "plugin_install_error",
+                details=e
+            )
         )
 
     # --------------------------------------------------------
@@ -504,8 +579,9 @@ def install_playnite_plugin():
     ):
 
         raise RuntimeError(
-            "Os arquivos foram copiados, mas a instalação "
-            "do plugin não pôde ser validada."
+            t(
+                "plugin_validation_error"
+            )
         )
 
     return True
@@ -593,7 +669,9 @@ def format_datetime(
         return "—"
 
     return value.strftime(
-        "%d/%m/%Y às %H:%M:%S"
+        t(
+            "datetime_format"
+        )
     )
 
 
@@ -601,7 +679,9 @@ def format_age(
     value
 ):
     if not value:
-        return "Nunca"
+        return t(
+            "never"
+        )
 
     delta = (
         datetime.now()
@@ -617,8 +697,8 @@ def format_age(
     )
 
     if seconds < 60:
-        return (
-            "há menos de 1 minuto"
+        return t(
+            "age_less_than_minute"
         )
 
     minutes = (
@@ -628,10 +708,13 @@ def format_age(
     if minutes < 60:
 
         if minutes == 1:
-            return "há 1 minuto"
+            return t(
+                "age_one_minute"
+            )
 
-        return (
-            f"há {minutes} minutos"
+        return t(
+            "age_minutes",
+            count=minutes
         )
 
     hours = (
@@ -641,10 +724,13 @@ def format_age(
     if hours < 24:
 
         if hours == 1:
-            return "há 1 hora"
+            return t(
+                "age_one_hour"
+            )
 
-        return (
-            f"há {hours} horas"
+        return t(
+            "age_hours",
+            count=hours
         )
 
     days = (
@@ -652,10 +738,13 @@ def format_age(
     )
 
     if days == 1:
-        return "há 1 dia"
+        return t(
+            "age_one_day"
+        )
 
-    return (
-        f"há {days} dias"
+    return t(
+        "age_days",
+        count=days
     )
 
 
@@ -668,8 +757,9 @@ def read_playnite_export():
     if not PLAYNITE_EXPORT_FILE.exists():
 
         raise FileNotFoundError(
-            "A biblioteca exportada pelo Playnite "
-            "ainda não foi encontrada."
+            t(
+                "playnite_export_not_found"
+            )
         )
 
     try:
@@ -686,17 +776,19 @@ def read_playnite_export():
     except json.JSONDecodeError as e:
 
         raise RuntimeError(
-            "O arquivo exportado pelo Playnite "
-            "não contém JSON válido.\n\n"
-            f"{e}"
+            t(
+                "playnite_invalid_json",
+                details=e
+            )
         )
 
     except Exception as e:
 
         raise RuntimeError(
-            "Não foi possível ler a biblioteca "
-            "exportada pelo Playnite.\n\n"
-            f"{e}"
+            t(
+                "playnite_read_error",
+                details=e
+            )
         )
 
     if isinstance(
@@ -714,8 +806,9 @@ def read_playnite_export():
     ):
 
         raise RuntimeError(
-            "Formato inesperado na biblioteca "
-            "exportada pelo Playnite."
+            t(
+                "playnite_unexpected_format"
+            )
         )
 
     games = []
@@ -810,7 +903,7 @@ def get_source_counts(
                 "source"
             )
             or
-            "Sem fonte"
+            t("unknown_source")
         )
 
         counts[source] = (
@@ -916,8 +1009,10 @@ def get_steam_wishlist_appids(
     ):
 
         raise RuntimeError(
-            "A Steam respondeu com HTTP "
-            f"{response.status_code}."
+            t(
+                "steam_http_error",
+                status=response.status_code
+            )
         )
 
     try:
@@ -929,7 +1024,9 @@ def get_steam_wishlist_appids(
     except requests.exceptions.JSONDecodeError:
 
         raise RuntimeError(
-            "A Steam não retornou JSON válido."
+            t(
+                "steam_invalid_json"
+            )
         )
 
     items = (
@@ -1141,7 +1238,7 @@ def compare_games(
                         (
                             game["source"]
                             or
-                            "Sem fonte"
+                            t("unknown_source")
                         ),
 
                     "score":
@@ -1198,7 +1295,7 @@ def compare_games(
                     (
                         game["source"]
                         or
-                        "Sem fonte"
+                        t("unknown_source")
                     ),
 
                 "score":
@@ -1242,6 +1339,20 @@ class WishlistApp(
 
         self.config_data = (
             load_config()
+        )
+
+        self.language_code = (
+            self.config_data.get(
+                "language",
+                "en_US"
+            )
+        )
+
+        if self.language_code not in LANGUAGE_LABELS:
+            self.language_code = "en_US"
+
+        load_translations(
+            self.language_code
         )
 
         self.plugin_restart_required = (
@@ -1292,6 +1403,8 @@ class WishlistApp(
         self.filtered_playnite_games = []
 
         self.wishlist = {}
+
+        self.wishlist_total = 0
 
         self.matches = []
 
@@ -1522,7 +1635,7 @@ class WishlistApp(
         self.refresh_button = (
             ctk.CTkButton(
                 self.sidebar,
-                text="↻  Atualizar biblioteca",
+                text=f"↻  {t('refresh_library')}",
                 height=46,
                 corner_radius=9,
                 fg_color=COLOR_BLUE,
@@ -1553,7 +1666,7 @@ class WishlistApp(
         steam_button = (
             ctk.CTkButton(
                 self.sidebar,
-                text="STEAM  ·  Conta",
+                text=t("steam_account_button"),
                 height=42,
                 corner_radius=8,
                 fg_color="transparent",
@@ -1576,7 +1689,7 @@ class WishlistApp(
         integration_button = (
             ctk.CTkButton(
                 self.sidebar,
-                text="PLAYNITE  ·  Integração",
+                text=t("playnite_integration_button"),
                 height=42,
                 corner_radius=8,
                 fg_color="transparent",
@@ -1594,6 +1707,63 @@ class WishlistApp(
             fill="x",
             padx=18,
             pady=5
+        )
+
+        language_label = (
+            ctk.CTkLabel(
+                self.sidebar,
+                text=t("language_label"),
+                anchor="w",
+                text_color=COLOR_TEXT_MUTED,
+                font=ctk.CTkFont(
+                    size=10,
+                    weight="bold"
+                )
+            )
+        )
+
+        language_label.pack(
+            fill="x",
+            padx=22,
+            pady=(
+                14,
+                5
+            )
+        )
+
+        self.language_selector = (
+            ctk.CTkOptionMenu(
+                self.sidebar,
+                values=list(
+                    LANGUAGE_CODES.keys()
+                ),
+                height=38,
+                corner_radius=8,
+                fg_color=COLOR_SURFACE_ALT,
+                button_color=COLOR_SURFACE_HOVER,
+                button_hover_color=COLOR_BLUE,
+                text_color=COLOR_TEXT,
+                dropdown_fg_color=COLOR_SURFACE_ALT,
+                dropdown_hover_color=COLOR_SURFACE_HOVER,
+                dropdown_text_color=COLOR_TEXT,
+                command=
+                    self.change_language
+            )
+        )
+
+        self.language_selector.pack(
+            fill="x",
+            padx=18,
+            pady=(
+                0,
+                5
+            )
+        )
+
+        self.language_selector.set(
+            LANGUAGE_LABELS[
+                self.language_code
+            ]
         )
 
         separator = (
@@ -1644,7 +1814,7 @@ class WishlistApp(
         self.playnite_status_label = (
             ctk.CTkLabel(
                 self.sidebar,
-                text="●  Playnite\n    verificando...",
+                text=t("status_playnite_checking"),
                 anchor="w",
                 justify="left",
                 wraplength=205,
@@ -1662,7 +1832,7 @@ class WishlistApp(
         self.plugin_status_label = (
             ctk.CTkLabel(
                 self.sidebar,
-                text="●  Plugin\n    verificando...",
+                text=t("status_plugin_checking"),
                 anchor="w",
                 justify="left",
                 wraplength=205,
@@ -1680,7 +1850,7 @@ class WishlistApp(
         self.sync_status_label = (
             ctk.CTkLabel(
                 self.sidebar,
-                text="●  Biblioteca\n    verificando...",
+                text=t("status_library_checking"),
                 anchor="w",
                 justify="left",
                 wraplength=205,
@@ -1736,6 +1906,161 @@ class WishlistApp(
             )
         )
 
+    def change_language(
+        self,
+        selected_label
+    ):
+
+        language_code = (
+            LANGUAGE_CODES.get(
+                selected_label
+            )
+        )
+
+        if not language_code:
+            return
+
+        if language_code == self.language_code:
+            return
+
+        if self.loading:
+            self.language_selector.set(
+                LANGUAGE_LABELS[
+                    self.language_code
+                ]
+            )
+
+            messagebox.showinfo(
+                t("language_change_title"),
+                t("language_change_during_update")
+            )
+
+            return
+
+        self.language_code = (
+            language_code
+        )
+
+        self.config_data[
+            "language"
+        ] = language_code
+
+        save_config(
+            self.config_data
+        )
+
+        load_translations(
+            language_code
+        )
+
+        self.rebuild_interface()
+
+
+    def rebuild_interface(
+        self
+    ):
+
+        for widget in (
+            self.winfo_children()
+        ):
+
+            try:
+                widget.destroy()
+            except Exception:
+                pass
+
+        self.logo_image = None
+
+        self.create_sidebar()
+
+        self.create_main_area()
+
+        self.configure_treeview_style()
+
+        self.update_integration_status_ui()
+
+        self.update_steam_account_status()
+
+        self.card_playnite.configure(
+            text=str(
+                len(
+                    self.playnite_games
+                )
+            )
+            if self.playnite_games
+            else "—"
+        )
+
+        self.card_wishlist.configure(
+            text=str(
+                self.wishlist_total
+            )
+            if self.wishlist_total
+            else "—"
+        )
+
+        self.card_matches.configure(
+            text=str(
+                len(
+                    self.matches
+                )
+            )
+            if self.wishlist_total
+            else "—"
+        )
+
+        self.card_unresolved.configure(
+            text=str(
+                self.failed_steam_names
+            )
+            if self.wishlist_total
+            else "—"
+        )
+
+        if self.matches:
+            self.update_source_filter()
+            self.apply_filters()
+
+        elif self.wishlist_total:
+            self.result_count_label.configure(
+                text=t(
+                    "result_count",
+                    shown=0,
+                    found=0
+                )
+            )
+
+        steam_id = (
+            self.config_data.get(
+                "steam_id_64",
+                ""
+            )
+        )
+
+        if not PLAYNITE_EXPORT_FILE.exists():
+            self.status_label.configure(
+                text=t(
+                    "playnite_not_synced_status"
+                )
+            )
+
+        elif not is_valid_steam_id_64(
+            steam_id
+        ):
+            self.status_label.configure(
+                text=t(
+                    "configure_steam_to_continue"
+                )
+            )
+
+        else:
+            self.status_label.configure(
+                text=t(
+                    "ready_refresh"
+                )
+            )
+
+
     def create_main_area(
         self
     ):
@@ -1790,7 +2115,7 @@ class WishlistApp(
         title = (
             ctk.CTkLabel(
                 header,
-                text="Seus matches",
+                text=t("main_title"),
                 font=ctk.CTkFont(
                     size=27,
                     weight="bold"
@@ -1806,10 +2131,7 @@ class WishlistApp(
         subtitle = (
             ctk.CTkLabel(
                 header,
-                text=(
-                    "Jogos da sua wishlist Steam que "
-                    "já estão na sua biblioteca."
-                ),
+                text=t("main_subtitle"),
                 font=ctk.CTkFont(
                     size=13
                 ),
@@ -1861,7 +2183,7 @@ class WishlistApp(
                 0,
                 "PLAYNITE",
                 "—",
-                "jogos importados",
+                t("card_playnite_subtitle"),
                 COLOR_ORANGE,
                 "P"
             )
@@ -1873,7 +2195,7 @@ class WishlistApp(
                 1,
                 "WISHLIST",
                 "—",
-                "jogos desejados",
+                t("card_wishlist_subtitle"),
                 COLOR_CYAN,
                 "W"
             )
@@ -1885,7 +2207,7 @@ class WishlistApp(
                 2,
                 "MATCHES",
                 "—",
-                "já disponíveis",
+                t("card_matches_subtitle"),
                 COLOR_BLUE,
                 "✓"
             )
@@ -1895,9 +2217,9 @@ class WishlistApp(
             self.create_card(
                 cards,
                 3,
-                "PENDENTES",
+                t("card_pending_title"),
                 "—",
-                "não identificados",
+                t("card_pending_subtitle"),
                 COLOR_TEXT_MUTED,
                 "?"
             )
@@ -1935,8 +2257,7 @@ class WishlistApp(
         self.search_entry = (
             ctk.CTkEntry(
                 filters,
-                placeholder_text=
-                    "Pesquisar por jogo...",
+                placeholder_text=t("search_placeholder"),
                 height=42,
                 corner_radius=8,
                 fg_color=COLOR_SURFACE_ALT,
@@ -1964,7 +2285,7 @@ class WishlistApp(
             ctk.CTkOptionMenu(
                 filters,
                 values=[
-                    "Todas as bibliotecas"
+                    t("all_libraries")
                 ],
                 width=190,
                 height=42,
@@ -1996,9 +2317,9 @@ class WishlistApp(
             ctk.CTkOptionMenu(
                 filters,
                 values=[
-                    "Todos",
-                    "Exato",
-                    "Aproximado"
+                    t("all_matches"),
+                    t("exact_match"),
+                    t("approximate_match")
                 ],
                 width=150,
                 height=42,
@@ -2050,7 +2371,7 @@ class WishlistApp(
         result_title = (
             ctk.CTkLabel(
                 result_header,
-                text="Resultados",
+                text=t("results_title"),
                 font=ctk.CTkFont(
                     size=15,
                     weight="bold"
@@ -2066,7 +2387,7 @@ class WishlistApp(
         self.result_count_label = (
             ctk.CTkLabel(
                 result_header,
-                text="Nenhum resultado carregado.",
+                text=t("no_results_loaded"),
                 font=ctk.CTkFont(
                     size=12
                 ),
@@ -2137,12 +2458,12 @@ class WishlistApp(
 
         self.tree.heading(
             "playnite",
-            text="NO PLAYNITE"
+            text=t("column_playnite")
         )
 
         self.tree.heading(
             "source",
-            text="BIBLIOTECA"
+            text=t("column_library")
         )
 
         self.tree.heading(
@@ -2152,7 +2473,7 @@ class WishlistApp(
 
         self.tree.heading(
             "score",
-            text="SIMILARIDADE"
+            text=t("column_similarity")
         )
 
         self.tree.column(
@@ -2254,7 +2575,7 @@ class WishlistApp(
         self.status_label = (
             ctk.CTkLabel(
                 footer,
-                text="Pronto para verificar.",
+                text=t("ready_to_check"),
                 anchor="w",
                 text_color=COLOR_TEXT_SECONDARY,
                 font=ctk.CTkFont(
@@ -2546,9 +2867,10 @@ class WishlistApp(
 
             self.steam_status_label.configure(
                 text=(
-                    "●  Steam\n"
-                    "    Configurada\n"
-                    f"    {masked}"
+                    t(
+                        "status_steam_configured",
+                        steam_id=masked
+                    )
                 ),
                 text_color=COLOR_BLUE
             )
@@ -2557,8 +2879,9 @@ class WishlistApp(
 
             self.steam_status_label.configure(
                 text=(
-                    "●  Steam\n"
-                    "    Não configurada"
+                    t(
+                        "status_steam_not_configured"
+                    )
                 ),
                 text_color=COLOR_DANGER
             )
@@ -2585,8 +2908,9 @@ class WishlistApp(
 
             self.playnite_status_label.configure(
                 text=(
-                    "●  Playnite\n"
-                    "    Não encontrado"
+                    t(
+                        "status_playnite_not_found"
+                    )
                 ),
                 text_color=COLOR_DANGER
             )
@@ -2597,8 +2921,9 @@ class WishlistApp(
 
             self.playnite_status_label.configure(
                 text=(
-                    "●  Playnite\n"
-                    "    Em execução"
+                    t(
+                        "status_playnite_running"
+                    )
                 ),
                 text_color=COLOR_ORANGE
             )
@@ -2607,8 +2932,9 @@ class WishlistApp(
 
             self.playnite_status_label.configure(
                 text=(
-                    "●  Playnite\n"
-                    "    Instalado"
+                    t(
+                        "status_playnite_installed"
+                    )
                 ),
                 text_color=COLOR_ORANGE
             )
@@ -2625,8 +2951,9 @@ class WishlistApp(
 
                 self.plugin_status_label.configure(
                     text=(
-                        "●  Plugin\n"
-                        "    Instalado · reinicie o Playnite"
+                        t(
+                            "status_plugin_restart"
+                        )
                     ),
                     text_color=COLOR_WARNING
                 )
@@ -2635,8 +2962,9 @@ class WishlistApp(
 
                 self.plugin_status_label.configure(
                     text=(
-                        "●  Plugin\n"
-                        "    Instalado"
+                        t(
+                            "status_plugin_installed"
+                        )
                     ),
                     text_color=COLOR_SUCCESS
                 )
@@ -2645,8 +2973,9 @@ class WishlistApp(
 
             self.plugin_status_label.configure(
                 text=(
-                    "●  Plugin\n"
-                    "    Não instalado"
+                    t(
+                        "status_plugin_not_installed"
+                    )
                 ),
                 text_color=COLOR_DANGER
             )
@@ -2667,17 +2996,24 @@ class WishlistApp(
 
             self.sync_status_label.configure(
                 text=(
-                    "●  Biblioteca\n"
-                    "    Sincronizada "
-                    f"{format_age(modified)}"
+                    t(
+                        "status_library_synced",
+                        age=format_age(
+                            modified
+                        )
+                    )
                 ),
                 text_color=COLOR_CYAN
             )
 
             self.file_status_label.configure(
                 text=(
-                    "ÚLTIMA SINCRONIZAÇÃO\n"
-                    f"{format_datetime(modified)}"
+                    t(
+                        "last_sync",
+                        datetime=format_datetime(
+                            modified
+                        )
+                    )
                 )
             )
 
@@ -2685,16 +3021,18 @@ class WishlistApp(
 
             self.sync_status_label.configure(
                 text=(
-                    "●  Biblioteca\n"
-                    "    Não sincronizada"
+                    t(
+                        "status_library_not_synced"
+                    )
                 ),
                 text_color=COLOR_DANGER
             )
 
             self.file_status_label.configure(
                 text=(
-                    "Abra o Playnite após instalar "
-                    "a integração."
+                    t(
+                        "open_playnite_after_install"
+                    )
                 )
             )
 
@@ -2710,8 +3048,9 @@ class WishlistApp(
 
             self.status_label.configure(
                 text=(
-                    "Integração Playnite ainda "
-                    "não sincronizada."
+                    t(
+                        "playnite_not_synced_status"
+                    )
                 )
             )
 
@@ -2760,8 +3099,9 @@ class WishlistApp(
 
                 self.status_label.configure(
                     text=(
-                        "Configure sua conta Steam "
-                        "para continuar."
+                        t(
+                            "configure_steam_to_continue"
+                        )
                     )
                 )
 
@@ -2769,15 +3109,16 @@ class WishlistApp(
 
                 self.status_label.configure(
                     text=(
-                        "Pronto. Clique em "
-                        "Atualizar biblioteca."
+                        t(
+                            "ready_refresh"
+                        )
                     )
                 )
 
         except Exception as e:
 
             messagebox.showerror(
-                "Erro no Playnite",
+                t("playnite_error_title"),
                 str(
                     e
                 )
@@ -2799,7 +3140,7 @@ class WishlistApp(
         )
 
         dialog.title(
-            "Conta Steam"
+            t("steam_account_title")
         )
 
         dialog.geometry(
@@ -2820,7 +3161,7 @@ class WishlistApp(
         title = (
             ctk.CTkLabel(
                 dialog,
-                text="Conta Steam",
+                text=t("steam_account_title"),
                 font=ctk.CTkFont(
                     size=22,
                     weight="bold"
@@ -2840,10 +3181,7 @@ class WishlistApp(
         description = (
             ctk.CTkLabel(
                 dialog,
-                text=(
-                    "Informe o seu SteamID64.\n"
-                    "Ele será salvo somente neste computador."
-                ),
+                text=t("steam_account_description"),
                 justify="left",
                 text_color="gray70"
             )
@@ -2906,7 +3244,7 @@ class WishlistApp(
             ctk.CTkLabel(
                 dialog,
                 text=(
-                    "Exemplo: 76561198349875986"
+                    t("steam_id_example")
                 ),
                 text_color="gray55",
                 font=ctk.CTkFont(
@@ -2940,7 +3278,7 @@ class WishlistApp(
         save_button = (
             ctk.CTkButton(
                 buttons,
-                text="Salvar",
+                text=t("save"),
                 command=lambda:
                     self.save_steam_settings(
                         dialog,
@@ -2956,7 +3294,7 @@ class WishlistApp(
         cancel_button = (
             ctk.CTkButton(
                 buttons,
-                text="Cancelar",
+                text=t("cancel"),
                 fg_color="transparent",
                 border_width=1,
                 command=
@@ -2986,10 +3324,9 @@ class WishlistApp(
         ):
 
             messagebox.showerror(
-                "SteamID64 inválido",
+                t("invalid_steam_id_title"),
                 (
-                    "Informe um SteamID64 válido.\n\n"
-                    "Ele deve conter 17 números."
+                    t("invalid_steam_id_message")
                 ),
                 parent=dialog
             )
@@ -3009,11 +3346,12 @@ class WishlistApp(
         except Exception as e:
 
             messagebox.showerror(
-                "Erro",
+                t("error_title"),
                 (
-                    "Não foi possível salvar "
-                    "a configuração.\n\n"
-                    f"{e}"
+                    t(
+                        "save_config_error",
+                        details=e
+                    )
                 ),
                 parent=dialog
             )
@@ -3024,8 +3362,9 @@ class WishlistApp(
 
         self.status_label.configure(
             text=(
-                "Conta Steam configurada. "
-                "Clique em Atualizar dados."
+                t(
+                    "steam_account_saved"
+                )
             )
         )
 
@@ -3053,7 +3392,7 @@ class WishlistApp(
         )
 
         dialog.title(
-            "Integração com Playnite"
+            t("playnite_integration_title")
         )
 
         dialog.geometry(
@@ -3075,7 +3414,7 @@ class WishlistApp(
             ctk.CTkLabel(
                 dialog,
                 text=(
-                    "Integração com Playnite"
+                    t("playnite_integration_title")
                 ),
                 font=ctk.CTkFont(
                     size=22,
@@ -3102,13 +3441,13 @@ class WishlistApp(
         ]:
 
             playnite_text = (
-                "✓ Playnite encontrado"
+                t("integration_playnite_found")
             )
 
         else:
 
             playnite_text = (
-                "✕ Playnite não encontrado"
+                t("integration_playnite_not_found")
             )
 
         # ----------------------------------------------------
@@ -3120,13 +3459,13 @@ class WishlistApp(
         ]:
 
             plugin_text = (
-                "✓ Plugin instalado"
+                t("integration_plugin_installed")
             )
 
         else:
 
             plugin_text = (
-                "✕ Plugin não instalado"
+                t("integration_plugin_not_installed")
             )
 
         # ----------------------------------------------------
@@ -3138,13 +3477,13 @@ class WishlistApp(
         ]:
 
             library_text = (
-                "✓ Biblioteca sincronizada"
+                t("integration_library_synced")
             )
 
         else:
 
             library_text = (
-                "✕ Biblioteca ainda não sincronizada"
+                t("integration_library_not_synced")
             )
 
         info = (
@@ -3154,7 +3493,7 @@ class WishlistApp(
                     f"{playnite_text}\n\n"
                     f"{plugin_text}\n\n"
                     f"{library_text}\n\n"
-                    "Última sincronização:\n"
+                    f"{t('integration_last_sync')}"
                     f"{format_datetime(status['export_modified'])}"
                 ),
                 justify="left",
@@ -3180,8 +3519,9 @@ class WishlistApp(
                 ctk.CTkLabel(
                     dialog,
                     text=(
-                        "⚠ Os arquivos distribuíveis do "
-                        "plugin não foram encontrados."
+                        t(
+                            "integration_plugin_files_missing"
+                        )
                     ),
                     text_color="#e6b450",
                     justify="left"
@@ -3207,8 +3547,9 @@ class WishlistApp(
                 ctk.CTkLabel(
                     dialog,
                     text=(
-                        "⚠ Plugin instalado. Reinicie o "
-                        "Playnite para ativá-lo."
+                        t(
+                            "integration_restart_required"
+                        )
                     ),
                     text_color="#e6b450",
                     justify="left"
@@ -3247,13 +3588,13 @@ class WishlistApp(
         ]:
 
             install_text = (
-                "Reinstalar plugin"
+                t("reinstall_plugin")
             )
 
         else:
 
             install_text = (
-                "Instalar plugin"
+                t("install_plugin")
             )
 
         install_button = (
@@ -3288,7 +3629,7 @@ class WishlistApp(
         verify_button = (
             ctk.CTkButton(
                 buttons,
-                text="Verificar novamente",
+                text=t("check_again"),
                 fg_color="transparent",
                 border_width=1,
                 command=lambda:
@@ -3306,7 +3647,7 @@ class WishlistApp(
         close_button = (
             ctk.CTkButton(
                 buttons,
-                text="Fechar",
+                text=t("close"),
                 fg_color="transparent",
                 border_width=1,
                 command=
@@ -3336,13 +3677,9 @@ class WishlistApp(
 
             proceed = (
                 messagebox.askyesno(
-                    "Playnite está aberto",
+                    t("playnite_running_title"),
                     (
-                        "O Playnite está em execução.\n\n"
-                        "O plugin pode ser copiado agora, "
-                        "mas será necessário reiniciar o "
-                        "Playnite para ativá-lo.\n\n"
-                        "Deseja continuar?"
+                        t("playnite_running_install_message")
                     ),
                     parent=dialog
                 )
@@ -3355,11 +3692,9 @@ class WishlistApp(
 
             proceed = (
                 messagebox.askyesno(
-                    "Instalar integração",
+                    t("install_integration_title"),
                     (
-                        "O aplicativo instalará o plugin "
-                        "Steam Wishlist Exporter no Playnite.\n\n"
-                        "Deseja continuar?"
+                        t("install_integration_message")
                     ),
                     parent=dialog
                 )
@@ -3375,7 +3710,7 @@ class WishlistApp(
         except Exception as e:
 
             messagebox.showerror(
-                "Erro ao instalar",
+                t("install_error_title"),
                 str(
                     e
                 ),
@@ -3391,12 +3726,9 @@ class WishlistApp(
         self.update_integration_status_ui()
 
         messagebox.showinfo(
-            "Plugin instalado",
+            t("plugin_installed_title"),
             (
-                "O plugin do Playnite foi instalado "
-                "com sucesso.\n\n"
-                "Agora reinicie o Playnite para que "
-                "a integração seja carregada."
+                t("plugin_installed_message")
             ),
             parent=dialog
         )
@@ -3447,11 +3779,8 @@ class WishlistApp(
         ):
 
             messagebox.showwarning(
-                "Conta Steam",
-                (
-                    "Configure seu SteamID64 "
-                    "antes de atualizar os dados."
-                )
+                t("steam_account_title"),
+                t("configure_steam_before_refresh")
             )
 
             self.show_steam_settings()
@@ -3467,13 +3796,8 @@ class WishlistApp(
         ]:
 
             messagebox.showwarning(
-                "Integração Playnite",
-                (
-                    "O plugin do Playnite ainda "
-                    "não está instalado.\n\n"
-                    "Abra Integração Playnite "
-                    "e instale o plugin."
-                )
+                t("playnite_integration_button"),
+                t("plugin_not_installed_warning")
             )
 
             self.show_integration_info()
@@ -3484,12 +3808,7 @@ class WishlistApp(
 
             messagebox.showwarning(
                 "Playnite",
-                (
-                    "A biblioteca do Playnite ainda "
-                    "não foi sincronizada.\n\n"
-                    "Reinicie ou abra o Playnite e "
-                    "aguarde alguns segundos."
-                )
+                t("library_not_synced_warning")
             )
 
             return
@@ -3500,7 +3819,7 @@ class WishlistApp(
 
         self.refresh_button.configure(
             state="disabled",
-            text="Atualizando..."
+            text=t("updating")
         )
 
         self.progress_bar.set(
@@ -3537,7 +3856,7 @@ class WishlistApp(
             self.event_queue.put(
                 (
                     "status",
-                    "Lendo biblioteca do Playnite..."
+                    t("reading_playnite_library")
                 )
             )
 
@@ -3572,7 +3891,7 @@ class WishlistApp(
             self.event_queue.put(
                 (
                     "status",
-                    "Obtendo wishlist da Steam..."
+                    t("getting_steam_wishlist")
                 )
             )
 
@@ -3660,7 +3979,7 @@ class WishlistApp(
             self.event_queue.put(
                 (
                     "status",
-                    "Comparando bibliotecas..."
+                    t("comparing_libraries")
                 )
             )
 
@@ -3742,13 +4061,19 @@ class WishlistApp(
 
                     self.status_label.configure(
                         text=(
-                            "Obtendo nomes da Steam: "
-                            f"{data['current']}/"
-                            f"{data['total']}"
+                            t(
+                                "getting_steam_names",
+                                current=data["current"],
+                                total=data["total"]
+                            )
                         )
                     )
 
                 elif event == "wishlist_total":
+
+                    self.wishlist_total = (
+                        data
+                    )
 
                     self.card_wishlist.configure(
                         text=str(
@@ -3804,11 +4129,15 @@ class WishlistApp(
                         ]
                     )
 
+                    self.wishlist_total = (
+                        data[
+                            "wishlist_total"
+                        ]
+                    )
+
                     self.card_wishlist.configure(
                         text=str(
-                            data[
-                                "wishlist_total"
-                            ]
+                            self.wishlist_total
                         )
                     )
 
@@ -3828,8 +4157,12 @@ class WishlistApp(
 
                     self.steam_status_label.configure(
                         text=(
-                            "●  Steam\n"
-                            f"    {len(self.wishlist)} jogos identificados"
+                            t(
+                                "status_steam_games_identified",
+                                count=len(
+                                    self.wishlist
+                                )
+                            )
                         ),
                         text_color=COLOR_SUCCESS
                     )
@@ -3844,9 +4177,12 @@ class WishlistApp(
 
                     self.status_label.configure(
                         text=(
-                            "Concluído. "
-                            f"{len(self.matches)} "
-                            "correspondências encontradas."
+                            t(
+                                "refresh_complete",
+                                count=len(
+                                    self.matches
+                                )
+                            )
                         )
                     )
 
@@ -3856,7 +4192,7 @@ class WishlistApp(
 
                     self.refresh_button.configure(
                         state="normal",
-                        text="↻  Atualizar biblioteca"
+                        text=f"↻  {t('refresh_library')}"
                     )
 
                     self.update_integration_status_ui()
@@ -3869,7 +4205,7 @@ class WishlistApp(
 
                     self.refresh_button.configure(
                         state="normal",
-                        text="↻  Atualizar biblioteca"
+                        text=f"↻  {t('refresh_library')}"
                     )
 
                     self.progress_bar.set(
@@ -3878,12 +4214,14 @@ class WishlistApp(
 
                     self.status_label.configure(
                         text=(
-                            "Erro durante a atualização."
+                            t(
+                                "refresh_error"
+                            )
                         )
                     )
 
                     messagebox.showerror(
-                        "Erro",
+                        t("error_title"),
                         data
                     )
 
@@ -3914,7 +4252,7 @@ class WishlistApp(
 
         values = (
             [
-                "Todas as bibliotecas"
+                t("all_libraries")
             ]
             +
             sources
@@ -3925,7 +4263,7 @@ class WishlistApp(
         )
 
         self.source_filter.set(
-            "Todas as bibliotecas"
+            t("all_libraries")
         )
 
 
@@ -3978,7 +4316,7 @@ class WishlistApp(
             if (
                 source_filter
                 !=
-                "Todas as bibliotecas"
+                t("all_libraries")
             ):
 
                 if (
@@ -3994,15 +4332,24 @@ class WishlistApp(
             if (
                 match_filter
                 !=
-                "Todos"
+                t("all_matches")
             ):
+
+                expected_type = (
+                    "Exato"
+                    if match_filter
+                    ==
+                    t("exact_match")
+                    else
+                    "Aproximado"
+                )
 
                 if (
                     item[
                         "type"
                     ]
                     !=
-                    match_filter
+                    expected_type
                 ):
 
                     continue
@@ -4016,9 +4363,14 @@ class WishlistApp(
         )
 
         self.result_count_label.configure(
-            text=(
-                f"{len(filtered)} exibido(s) · "
-                f"{len(self.matches)} encontrado(s)"
+            text=t(
+                "result_count",
+                shown=len(
+                    filtered
+                ),
+                found=len(
+                    self.matches
+                )
             )
         )
 
@@ -4052,12 +4404,12 @@ class WishlistApp(
             )
 
             match_text = (
-                "● EXATO"
+                t("match_exact_short")
                 if item[
                     "type"
                 ] == "Exato"
                 else
-                "● APROX."
+                t("match_approx_short")
             )
 
             self.tree.insert(
