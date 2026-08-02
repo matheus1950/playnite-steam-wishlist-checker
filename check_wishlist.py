@@ -12,6 +12,7 @@ from pathlib import Path
 from datetime import datetime
 from tkinter import ttk, messagebox
 
+from PIL import Image
 import customtkinter as ctk
 import requests
 from rapidfuzz import process, fuzz
@@ -22,7 +23,7 @@ from rapidfuzz import process, fuzz
 # ============================================================
 
 APP_NAME = "Steam Wishlist × Playnite"
-APP_VERSION = "1.2.1"
+APP_VERSION = "1.2.2"
 
 
 # ============================================================
@@ -106,6 +107,12 @@ APP_ICON = (
     ASSETS_DIR
     /
     "app.ico"
+)
+
+APP_LOGO = (
+    ASSETS_DIR
+    /
+    "app.png"
 )
 
 BUNDLED_PLUGIN_DIR = (
@@ -206,6 +213,34 @@ ctk.set_appearance_mode(
 ctk.set_default_color_theme(
     "blue"
 )
+
+
+# ============================================================
+# IDENTIDADE VISUAL
+# ============================================================
+
+COLOR_BG = "#15171C"
+COLOR_SIDEBAR = "#1B1E24"
+COLOR_SURFACE = "#20242B"
+COLOR_SURFACE_ALT = "#242933"
+COLOR_SURFACE_HOVER = "#2A303A"
+COLOR_TABLE = "#1C2026"
+COLOR_TABLE_ALT = "#20252D"
+COLOR_TABLE_HEADER = "#2B313B"
+COLOR_BORDER = "#323A47"
+
+COLOR_BLUE = "#258DFF"
+COLOR_BLUE_HOVER = "#1677D2"
+COLOR_CYAN = "#31C8FF"
+COLOR_ORANGE = "#FF7A18"
+COLOR_ORANGE_DARK = "#C85A0A"
+
+COLOR_TEXT = "#F5F7FA"
+COLOR_TEXT_SECONDARY = "#A7B0BD"
+COLOR_TEXT_MUTED = "#6F7988"
+COLOR_SUCCESS = "#45C486"
+COLOR_WARNING = "#F2B84B"
+COLOR_DANGER = "#E46C6C"
 
 
 # ============================================================
@@ -1220,22 +1255,26 @@ class WishlistApp(
         self.title(
             APP_NAME
         )
-        
+
         try:
             if APP_ICON.exists():
                 self.iconbitmap(
                     str(APP_ICON)
                 )
         except Exception:
-            pass        
+            pass
 
         self.geometry(
-            "1280x800"
+            "1360x840"
         )
 
         self.minsize(
-            1050,
-            650
+            1120,
+            700
+        )
+
+        self.configure(
+            fg_color=COLOR_BG
         )
 
         # ----------------------------------------------------
@@ -1261,6 +1300,8 @@ class WishlistApp(
         self.failed_steam_names = 0
 
         self.integration_status = {}
+
+        self.logo_image = None
 
         # ----------------------------------------------------
         # GRID
@@ -1297,11 +1338,6 @@ class WishlistApp(
             self.initial_load
         )
 
-
-    # ========================================================
-    # SIDEBAR
-    # ========================================================
-
     def create_sidebar(
         self
     ):
@@ -1309,8 +1345,9 @@ class WishlistApp(
         self.sidebar = (
             ctk.CTkFrame(
                 self,
-                width=240,
-                corner_radius=0
+                width=265,
+                corner_radius=0,
+                fg_color=COLOR_SIDEBAR
             )
         )
 
@@ -1324,76 +1361,177 @@ class WishlistApp(
             False
         )
 
+        # ----------------------------------------------------
+        # MARCA
+        # ----------------------------------------------------
+
+        brand = (
+            ctk.CTkFrame(
+                self.sidebar,
+                fg_color="transparent"
+            )
+        )
+
+        brand.pack(
+            fill="x",
+            padx=22,
+            pady=(
+                24,
+                10
+            )
+        )
+
+        if APP_LOGO.exists():
+
+            try:
+
+                logo_source = (
+                    Image.open(
+                        APP_LOGO
+                    )
+                )
+
+                self.logo_image = (
+                    ctk.CTkImage(
+                        light_image=logo_source,
+                        dark_image=logo_source,
+                        size=(
+                            56,
+                            56
+                        )
+                    )
+                )
+
+                logo = (
+                    ctk.CTkLabel(
+                        brand,
+                        text="",
+                        image=self.logo_image
+                    )
+                )
+
+                logo.grid(
+                    row=0,
+                    column=0,
+                    rowspan=3,
+                    sticky="nw",
+                    padx=(
+                        0,
+                        12
+                    )
+                )
+
+            except Exception:
+                pass
+
+        brand_text = (
+            ctk.CTkFrame(
+                brand,
+                fg_color="transparent"
+            )
+        )
+
+        brand_text.grid(
+            row=0,
+            column=1,
+            sticky="nw"
+        )
+
         title = (
             ctk.CTkLabel(
-                self.sidebar,
+                brand_text,
                 text="Wishlist\nChecker",
                 font=ctk.CTkFont(
-                    size=27,
+                    size=23,
                     weight="bold"
                 ),
-                justify="left"
+                text_color=COLOR_TEXT,
+                justify="left",
+                anchor="w"
             )
         )
 
         title.pack(
-            anchor="w",
-            padx=25,
-            pady=(
-                30,
-                5
-            )
+            anchor="w"
         )
 
         subtitle = (
             ctk.CTkLabel(
-                self.sidebar,
-                text="Steam × Playnite",
+                brand_text,
+                text="STEAM × PLAYNITE",
                 font=ctk.CTkFont(
-                    size=14
+                    size=10,
+                    weight="bold"
                 ),
-                text_color="gray70"
+                text_color=COLOR_CYAN
             )
         )
 
         subtitle.pack(
             anchor="w",
-            padx=25,
             pady=(
-                0,
-                5
+                5,
+                0
             )
         )
 
-        version_label = (
+        version_badge = (
             ctk.CTkLabel(
-                self.sidebar,
-                text=f"v{APP_VERSION}",
+                brand_text,
+                text=f"  v{APP_VERSION}  ",
+                height=22,
+                corner_radius=6,
+                fg_color=COLOR_SURFACE_ALT,
+                text_color=COLOR_TEXT_SECONDARY,
                 font=ctk.CTkFont(
-                    size=11
-                ),
-                text_color="gray55"
+                    size=10
+                )
             )
         )
 
-        version_label.pack(
+        version_badge.pack(
             anchor="w",
-            padx=25,
             pady=(
-                0,
-                25
+                7,
+                0
+            )
+        )
+
+        brand_accent = (
+            ctk.CTkFrame(
+                self.sidebar,
+                height=3,
+                corner_radius=2,
+                fg_color=COLOR_ORANGE
+            )
+        )
+
+        brand_accent.pack(
+            fill="x",
+            padx=22,
+            pady=(
+                4,
+                18
             )
         )
 
         # ----------------------------------------------------
-        # ATUALIZAR
+        # AÇÃO PRINCIPAL
         # ----------------------------------------------------
 
         self.refresh_button = (
             ctk.CTkButton(
                 self.sidebar,
-                text="Atualizar dados",
-                height=42,
+                text="↻  Atualizar biblioteca",
+                height=46,
+                corner_radius=9,
+                fg_color=COLOR_BLUE,
+                hover_color=COLOR_BLUE_HOVER,
+                text_color="#FFFFFF",
+                font=ctk.CTkFont(
+                    size=13,
+                    weight="bold"
+                ),
                 command=
                     self.start_refresh
             )
@@ -1401,21 +1539,29 @@ class WishlistApp(
 
         self.refresh_button.pack(
             fill="x",
-            padx=20,
-            pady=8
+            padx=18,
+            pady=(
+                0,
+                10
+            )
         )
 
         # ----------------------------------------------------
-        # CONTA STEAM
+        # CONFIGURAÇÕES
         # ----------------------------------------------------
 
         steam_button = (
             ctk.CTkButton(
                 self.sidebar,
-                text="Conta Steam",
-                height=40,
+                text="STEAM  ·  Conta",
+                height=42,
+                corner_radius=8,
                 fg_color="transparent",
+                hover_color=COLOR_SURFACE_HOVER,
                 border_width=1,
+                border_color=COLOR_BORDER,
+                text_color=COLOR_TEXT,
+                anchor="w",
                 command=
                     self.show_steam_settings
             )
@@ -1423,21 +1569,22 @@ class WishlistApp(
 
         steam_button.pack(
             fill="x",
-            padx=20,
-            pady=8
+            padx=18,
+            pady=5
         )
-
-        # ----------------------------------------------------
-        # PLAYNITE
-        # ----------------------------------------------------
 
         integration_button = (
             ctk.CTkButton(
                 self.sidebar,
-                text="Integração Playnite",
-                height=40,
+                text="PLAYNITE  ·  Integração",
+                height=42,
+                corner_radius=8,
                 fg_color="transparent",
+                hover_color=COLOR_SURFACE_HOVER,
                 border_width=1,
+                border_color=COLOR_BORDER,
+                text_color=COLOR_TEXT,
+                anchor="w",
                 command=
                     self.show_integration_info
             )
@@ -1445,107 +1592,125 @@ class WishlistApp(
 
         integration_button.pack(
             fill="x",
-            padx=20,
-            pady=8
+            padx=18,
+            pady=5
         )
 
         separator = (
             ctk.CTkFrame(
                 self.sidebar,
-                height=1
+                height=1,
+                fg_color=COLOR_BORDER
             )
         )
 
         separator.pack(
             fill="x",
-            padx=20,
+            padx=22,
             pady=20
         )
+
+        # ----------------------------------------------------
+        # STATUS
+        # ----------------------------------------------------
 
         status_title = (
             ctk.CTkLabel(
                 self.sidebar,
-                text="Status",
+                text="STATUS",
                 font=ctk.CTkFont(
-                    size=15,
+                    size=11,
                     weight="bold"
-                )
+                ),
+                text_color=COLOR_TEXT_MUTED
             )
         )
 
         status_title.pack(
             anchor="w",
-            padx=25
+            padx=24,
+            pady=(
+                0,
+                7
+            )
+        )
+
+        status_font = (
+            ctk.CTkFont(
+                size=12
+            )
         )
 
         self.playnite_status_label = (
             ctk.CTkLabel(
                 self.sidebar,
-                text="Playnite: verificando...",
+                text="●  Playnite\n    verificando...",
                 anchor="w",
                 justify="left",
-                wraplength=190
+                wraplength=205,
+                font=status_font,
+                text_color=COLOR_TEXT_SECONDARY
             )
         )
 
         self.playnite_status_label.pack(
             fill="x",
-            padx=25,
-            pady=(
-                10,
-                2
-            )
+            padx=24,
+            pady=5
         )
 
         self.plugin_status_label = (
             ctk.CTkLabel(
                 self.sidebar,
-                text="Plugin: verificando...",
+                text="●  Plugin\n    verificando...",
                 anchor="w",
                 justify="left",
-                wraplength=190
+                wraplength=205,
+                font=status_font,
+                text_color=COLOR_TEXT_SECONDARY
             )
         )
 
         self.plugin_status_label.pack(
             fill="x",
-            padx=25,
-            pady=2
+            padx=24,
+            pady=5
         )
 
         self.sync_status_label = (
             ctk.CTkLabel(
                 self.sidebar,
-                text="Biblioteca: verificando...",
+                text="●  Biblioteca\n    verificando...",
                 anchor="w",
                 justify="left",
-                wraplength=190
+                wraplength=205,
+                font=status_font,
+                text_color=COLOR_TEXT_SECONDARY
             )
         )
 
         self.sync_status_label.pack(
             fill="x",
-            padx=25,
-            pady=2
+            padx=24,
+            pady=5
         )
 
         self.steam_status_label = (
             ctk.CTkLabel(
                 self.sidebar,
-                text="Steam: —",
+                text="●  Steam\n    —",
                 anchor="w",
                 justify="left",
-                wraplength=190
+                wraplength=205,
+                font=status_font,
+                text_color=COLOR_TEXT_SECONDARY
             )
         )
 
         self.steam_status_label.pack(
             fill="x",
-            padx=25,
-            pady=(
-                15,
-                2
-            )
+            padx=24,
+            pady=5
         )
 
         self.file_status_label = (
@@ -1554,27 +1719,22 @@ class WishlistApp(
                 text="",
                 anchor="w",
                 justify="left",
-                wraplength=190,
-                text_color="gray60",
+                wraplength=205,
+                text_color=COLOR_TEXT_MUTED,
                 font=ctk.CTkFont(
-                    size=11
+                    size=10
                 )
             )
         )
 
         self.file_status_label.pack(
             fill="x",
-            padx=25,
+            padx=24,
             pady=(
-                20,
+                16,
                 0
             )
         )
-
-
-    # ========================================================
-    # ÁREA PRINCIPAL
-    # ========================================================
 
     def create_main_area(
         self
@@ -1584,7 +1744,7 @@ class WishlistApp(
             ctk.CTkFrame(
                 self,
                 corner_radius=0,
-                fg_color="transparent"
+                fg_color=COLOR_BG
             )
         )
 
@@ -1592,8 +1752,8 @@ class WishlistApp(
             row=0,
             column=1,
             sticky="nsew",
-            padx=25,
-            pady=20
+            padx=28,
+            pady=24
         )
 
         self.main_frame.grid_columnconfigure(
@@ -1623,26 +1783,46 @@ class WishlistApp(
             sticky="ew",
             pady=(
                 0,
-                18
+                20
             )
         )
 
         title = (
             ctk.CTkLabel(
                 header,
-                text=(
-                    "Jogos da wishlist que "
-                    "você já possui"
-                ),
+                text="Seus matches",
                 font=ctk.CTkFont(
-                    size=26,
+                    size=27,
                     weight="bold"
-                )
+                ),
+                text_color=COLOR_TEXT
             )
         )
 
         title.pack(
-            side="left"
+            anchor="w"
+        )
+
+        subtitle = (
+            ctk.CTkLabel(
+                header,
+                text=(
+                    "Jogos da sua wishlist Steam que "
+                    "já estão na sua biblioteca."
+                ),
+                font=ctk.CTkFont(
+                    size=13
+                ),
+                text_color=COLOR_TEXT_SECONDARY
+            )
+        )
+
+        subtitle.pack(
+            anchor="w",
+            pady=(
+                2,
+                0
+            )
         )
 
         # ----------------------------------------------------
@@ -1679,8 +1859,11 @@ class WishlistApp(
             self.create_card(
                 cards,
                 0,
-                "Playnite",
-                "—"
+                "PLAYNITE",
+                "—",
+                "jogos importados",
+                COLOR_ORANGE,
+                "P"
             )
         )
 
@@ -1688,8 +1871,11 @@ class WishlistApp(
             self.create_card(
                 cards,
                 1,
-                "Wishlist Steam",
-                "—"
+                "WISHLIST",
+                "—",
+                "jogos desejados",
+                COLOR_CYAN,
+                "W"
             )
         )
 
@@ -1697,8 +1883,11 @@ class WishlistApp(
             self.create_card(
                 cards,
                 2,
-                "Já possui",
-                "—"
+                "MATCHES",
+                "—",
+                "já disponíveis",
+                COLOR_BLUE,
+                "✓"
             )
         )
 
@@ -1706,18 +1895,25 @@ class WishlistApp(
             self.create_card(
                 cards,
                 3,
-                "Não identificados",
-                "—"
+                "PENDENTES",
+                "—",
+                "não identificados",
+                COLOR_TEXT_MUTED,
+                "?"
             )
         )
 
         # ----------------------------------------------------
-        # FILTROS
+        # TOOLBAR / FILTROS
         # ----------------------------------------------------
 
         filters = (
             ctk.CTkFrame(
-                self.main_frame
+                self.main_frame,
+                corner_radius=10,
+                fg_color=COLOR_SURFACE,
+                border_width=1,
+                border_color=COLOR_BORDER
             )
         )
 
@@ -1727,7 +1923,7 @@ class WishlistApp(
             sticky="ew",
             pady=(
                 0,
-                12
+                16
             )
         )
 
@@ -1740,8 +1936,13 @@ class WishlistApp(
             ctk.CTkEntry(
                 filters,
                 placeholder_text=
-                    "Pesquisar jogo...",
-                height=38
+                    "Pesquisar por jogo...",
+                height=42,
+                corner_radius=8,
+                fg_color=COLOR_SURFACE_ALT,
+                border_color=COLOR_BORDER,
+                text_color=COLOR_TEXT,
+                placeholder_text_color=COLOR_TEXT_MUTED
             )
         )
 
@@ -1765,6 +1966,17 @@ class WishlistApp(
                 values=[
                     "Todas as bibliotecas"
                 ],
+                width=190,
+                height=42,
+                corner_radius=8,
+                fg_color=COLOR_SURFACE_ALT,
+                button_color=COLOR_SURFACE_HOVER,
+                button_hover_color=COLOR_BLUE,
+                text_color=COLOR_TEXT,
+                dynamic_resizing=False,
+                dropdown_fg_color=COLOR_SURFACE_ALT,
+                dropdown_hover_color=COLOR_SURFACE_HOVER,
+                dropdown_text_color=COLOR_TEXT,
                 command=lambda _:
                     self.apply_filters()
             )
@@ -1773,7 +1985,10 @@ class WishlistApp(
         self.source_filter.grid(
             row=0,
             column=1,
-            padx=6,
+            padx=(
+                0,
+                8
+            ),
             pady=12
         )
 
@@ -1785,6 +2000,17 @@ class WishlistApp(
                     "Exato",
                     "Aproximado"
                 ],
+                width=150,
+                height=42,
+                corner_radius=8,
+                fg_color=COLOR_SURFACE_ALT,
+                button_color=COLOR_SURFACE_HOVER,
+                button_hover_color=COLOR_ORANGE,
+                text_color=COLOR_TEXT,
+                dynamic_resizing=False,
+                dropdown_fg_color=COLOR_SURFACE_ALT,
+                dropdown_hover_color=COLOR_SURFACE_HOVER,
+                dropdown_text_color=COLOR_TEXT,
                 command=lambda _:
                     self.apply_filters()
             )
@@ -1794,31 +2020,65 @@ class WishlistApp(
             row=0,
             column=2,
             padx=(
-                6,
+                0,
                 12
             ),
             pady=12
         )
 
         # ----------------------------------------------------
-        # CONTADOR
+        # RESULTADOS
         # ----------------------------------------------------
 
-        self.result_count_label = (
-            ctk.CTkLabel(
+        result_header = (
+            ctk.CTkFrame(
                 self.main_frame,
-                text="Nenhum resultado carregado.",
-                text_color="gray70"
+                fg_color="transparent"
             )
         )
 
-        self.result_count_label.grid(
+        result_header.grid(
             row=3,
             column=0,
-            sticky="w",
+            sticky="ew",
             pady=(
                 0,
-                8
+                9
+            )
+        )
+
+        result_title = (
+            ctk.CTkLabel(
+                result_header,
+                text="Resultados",
+                font=ctk.CTkFont(
+                    size=15,
+                    weight="bold"
+                ),
+                text_color=COLOR_TEXT
+            )
+        )
+
+        result_title.pack(
+            side="left"
+        )
+
+        self.result_count_label = (
+            ctk.CTkLabel(
+                result_header,
+                text="Nenhum resultado carregado.",
+                font=ctk.CTkFont(
+                    size=12
+                ),
+                text_color=COLOR_TEXT_MUTED
+            )
+        )
+
+        self.result_count_label.pack(
+            side="left",
+            padx=(
+                12,
+                0
             )
         )
 
@@ -1828,7 +2088,11 @@ class WishlistApp(
 
         table_frame = (
             ctk.CTkFrame(
-                self.main_frame
+                self.main_frame,
+                corner_radius=10,
+                fg_color=COLOR_SURFACE,
+                border_width=1,
+                border_color=COLOR_BORDER
             )
         )
 
@@ -1861,62 +2125,64 @@ class WishlistApp(
                 table_frame,
                 columns=columns,
                 show="headings",
-                selectmode="browse"
+                selectmode="browse",
+                style="Wishlist.Treeview"
             )
         )
 
         self.tree.heading(
             "wishlist",
-            text="Steam Wishlist"
+            text="STEAM WISHLIST"
         )
 
         self.tree.heading(
             "playnite",
-            text="No Playnite"
+            text="NO PLAYNITE"
         )
 
         self.tree.heading(
             "source",
-            text="Biblioteca"
+            text="BIBLIOTECA"
         )
 
         self.tree.heading(
             "type",
-            text="Match"
+            text="MATCH"
         )
 
         self.tree.heading(
             "score",
-            text="Similaridade"
+            text="SIMILARIDADE"
         )
 
         self.tree.column(
             "wishlist",
-            width=270,
+            width=290,
             minwidth=180
         )
 
         self.tree.column(
             "playnite",
-            width=270,
+            width=290,
             minwidth=180
         )
 
         self.tree.column(
             "source",
-            width=130,
+            width=140,
             minwidth=90
         )
 
         self.tree.column(
             "type",
-            width=110,
-            minwidth=80
+            width=120,
+            minwidth=90,
+            anchor="center"
         )
 
         self.tree.column(
             "score",
-            width=100,
+            width=110,
             minwidth=90,
             anchor="center"
         )
@@ -1960,7 +2226,7 @@ class WishlistApp(
         )
 
         # ----------------------------------------------------
-        # RODAPÉ
+        # RODAPÉ / STATUS BAR
         # ----------------------------------------------------
 
         footer = (
@@ -1988,8 +2254,12 @@ class WishlistApp(
         self.status_label = (
             ctk.CTkLabel(
                 footer,
-                text="Pronto.",
-                anchor="w"
+                text="Pronto para verificar.",
+                anchor="w",
+                text_color=COLOR_TEXT_SECONDARY,
+                font=ctk.CTkFont(
+                    size=12
+                )
             )
         )
 
@@ -2002,7 +2272,11 @@ class WishlistApp(
         self.progress_bar = (
             ctk.CTkProgressBar(
                 footer,
-                width=250
+                width=250,
+                height=8,
+                corner_radius=4,
+                fg_color=COLOR_SURFACE_ALT,
+                progress_color=COLOR_BLUE
             )
         )
 
@@ -2019,22 +2293,36 @@ class WishlistApp(
             0
         )
 
-
-    # ========================================================
-    # CARD
-    # ========================================================
-
     def create_card(
         self,
         parent,
         column,
         title,
-        value
+        value,
+        subtitle,
+        accent_color,
+        symbol
     ):
+
+        left_pad = (
+            0
+            if column == 0
+            else 6
+        )
+
+        right_pad = (
+            0
+            if column == 3
+            else 6
+        )
 
         frame = (
             ctk.CTkFrame(
-                parent
+                parent,
+                corner_radius=10,
+                fg_color=COLOR_SURFACE,
+                border_width=1,
+                border_color=COLOR_BORDER
             )
         )
 
@@ -2043,34 +2331,71 @@ class WishlistApp(
             column=column,
             sticky="ew",
             padx=(
-                0
-                if column == 0
-                else 6,
-
-                0
-                if column == 3
-                else 6
+                left_pad,
+                right_pad
             )
+        )
+
+        accent = (
+            ctk.CTkFrame(
+                frame,
+                height=3,
+                corner_radius=2,
+                fg_color=accent_color
+            )
+        )
+
+        accent.pack(
+            fill="x",
+            padx=12,
+            pady=(
+                8,
+                6
+            )
+        )
+
+        header = (
+            ctk.CTkFrame(
+                frame,
+                fg_color="transparent"
+            )
+        )
+
+        header.pack(
+            fill="x",
+            padx=16
         )
 
         title_label = (
             ctk.CTkLabel(
-                frame,
+                header,
                 text=title,
-                text_color="gray70",
+                text_color=COLOR_TEXT_SECONDARY,
                 font=ctk.CTkFont(
-                    size=13
+                    size=10,
+                    weight="bold"
                 )
             )
         )
 
         title_label.pack(
-            anchor="w",
-            padx=18,
-            pady=(
-                15,
-                2
+            side="left"
+        )
+
+        symbol_label = (
+            ctk.CTkLabel(
+                header,
+                text=symbol,
+                text_color=accent_color,
+                font=ctk.CTkFont(
+                    size=13,
+                    weight="bold"
+                )
             )
+        )
+
+        symbol_label.pack(
+            side="right"
         )
 
         value_label = (
@@ -2078,27 +2403,43 @@ class WishlistApp(
                 frame,
                 text=value,
                 font=ctk.CTkFont(
-                    size=26,
+                    size=27,
                     weight="bold"
-                )
+                ),
+                text_color=COLOR_TEXT
             )
         )
 
         value_label.pack(
             anchor="w",
-            padx=18,
+            padx=16,
+            pady=(
+                2,
+                0
+            )
+        )
+
+        subtitle_label = (
+            ctk.CTkLabel(
+                frame,
+                text=subtitle,
+                font=ctk.CTkFont(
+                    size=11
+                ),
+                text_color=COLOR_TEXT_MUTED
+            )
+        )
+
+        subtitle_label.pack(
+            anchor="w",
+            padx=16,
             pady=(
                 0,
-                15
+                10
             )
         )
 
         return value_label
-
-
-    # ========================================================
-    # ESTILO DA TABELA
-    # ========================================================
 
     def configure_treeview_style(
         self
@@ -2118,12 +2459,13 @@ class WishlistApp(
             pass
 
         style.configure(
-            "Treeview",
-            background="#242424",
-            fieldbackground="#242424",
-            foreground="#ffffff",
-            rowheight=34,
+            "Wishlist.Treeview",
+            background=COLOR_TABLE,
+            fieldbackground=COLOR_TABLE,
+            foreground=COLOR_TEXT,
+            rowheight=38,
             borderwidth=0,
+            relief="flat",
             font=(
                 "Segoe UI",
                 10
@@ -2131,31 +2473,53 @@ class WishlistApp(
         )
 
         style.configure(
-            "Treeview.Heading",
-            background="#333333",
-            foreground="#ffffff",
+            "Wishlist.Treeview.Heading",
+            background=COLOR_TABLE_HEADER,
+            foreground=COLOR_TEXT,
             relief="flat",
+            borderwidth=0,
             font=(
                 "Segoe UI",
-                10,
+                9,
                 "bold"
             )
         )
 
         style.map(
-            "Treeview",
+            "Wishlist.Treeview",
             background=[
                 (
                     "selected",
-                    "#1f6aa5"
+                    "#263E57"
+                )
+            ],
+            foreground=[
+                (
+                    "selected",
+                    "#FFFFFF"
                 )
             ]
         )
 
+        style.map(
+            "Wishlist.Treeview.Heading",
+            background=[
+                (
+                    "active",
+                    COLOR_SURFACE_HOVER
+                )
+            ]
+        )
 
-    # ========================================================
-    # STEAM STATUS
-    # ========================================================
+        self.tree.tag_configure(
+            "row_even",
+            background=COLOR_TABLE
+        )
+
+        self.tree.tag_configure(
+            "row_odd",
+            background=COLOR_TABLE_ALT
+        )
 
     def update_steam_account_status(
         self
@@ -2182,23 +2546,22 @@ class WishlistApp(
 
             self.steam_status_label.configure(
                 text=(
-                    "Steam: ✓ configurada\n"
-                    f"{masked}"
-                )
+                    "●  Steam\n"
+                    "    Configurada\n"
+                    f"    {masked}"
+                ),
+                text_color=COLOR_BLUE
             )
 
         else:
 
             self.steam_status_label.configure(
                 text=(
-                    "Steam: ✕ não configurada"
-                )
+                    "●  Steam\n"
+                    "    Não configurada"
+                ),
+                text_color=COLOR_DANGER
             )
-
-
-    # ========================================================
-    # PLAYNITE STATUS
-    # ========================================================
 
     def update_integration_status_ui(
         self
@@ -2222,8 +2585,10 @@ class WishlistApp(
 
             self.playnite_status_label.configure(
                 text=(
-                    "Playnite: ✕ não encontrado"
-                )
+                    "●  Playnite\n"
+                    "    Não encontrado"
+                ),
+                text_color=COLOR_DANGER
             )
 
         elif status[
@@ -2232,16 +2597,20 @@ class WishlistApp(
 
             self.playnite_status_label.configure(
                 text=(
-                    "Playnite: ✓ em execução"
-                )
+                    "●  Playnite\n"
+                    "    Em execução"
+                ),
+                text_color=COLOR_ORANGE
             )
 
         else:
 
             self.playnite_status_label.configure(
                 text=(
-                    "Playnite: ✓ instalado"
-                )
+                    "●  Playnite\n"
+                    "    Instalado"
+                ),
+                text_color=COLOR_ORANGE
             )
 
         # ----------------------------------------------------
@@ -2256,25 +2625,30 @@ class WishlistApp(
 
                 self.plugin_status_label.configure(
                     text=(
-                        "Plugin: ✓ instalado\n"
-                        "Reinicie o Playnite"
-                    )
+                        "●  Plugin\n"
+                        "    Instalado · reinicie o Playnite"
+                    ),
+                    text_color=COLOR_WARNING
                 )
 
             else:
 
                 self.plugin_status_label.configure(
                     text=(
-                        "Plugin: ✓ instalado"
-                    )
+                        "●  Plugin\n"
+                        "    Instalado"
+                    ),
+                    text_color=COLOR_SUCCESS
                 )
 
         else:
 
             self.plugin_status_label.configure(
                 text=(
-                    "Plugin: ✕ não instalado"
-                )
+                    "●  Plugin\n"
+                    "    Não instalado"
+                ),
+                text_color=COLOR_DANGER
             )
 
         # ----------------------------------------------------
@@ -2293,27 +2667,17 @@ class WishlistApp(
 
             self.sync_status_label.configure(
                 text=(
-                    "Biblioteca: ✓ sincronizada\n"
-                    +
-                    format_age(
-                        modified
-                    )
-                )
-            )
-
-            size_kb = (
-                status[
-                    "export_size"
-                ]
-                /
-                1024
+                    "●  Biblioteca\n"
+                    "    Sincronizada "
+                    f"{format_age(modified)}"
+                ),
+                text_color=COLOR_CYAN
             )
 
             self.file_status_label.configure(
                 text=(
-                    "Última sincronização\n"
-                    f"{format_datetime(modified)}\n"
-                    f"{size_kb:.1f} KB"
+                    "ÚLTIMA SINCRONIZAÇÃO\n"
+                    f"{format_datetime(modified)}"
                 )
             )
 
@@ -2321,8 +2685,10 @@ class WishlistApp(
 
             self.sync_status_label.configure(
                 text=(
-                    "Biblioteca: ✕ não sincronizada"
-                )
+                    "●  Biblioteca\n"
+                    "    Não sincronizada"
+                ),
+                text_color=COLOR_DANGER
             )
 
             self.file_status_label.configure(
@@ -2331,11 +2697,6 @@ class WishlistApp(
                     "a integração."
                 )
             )
-
-
-    # ========================================================
-    # INÍCIO
-    # ========================================================
 
     def initial_load(
         self
@@ -2409,7 +2770,7 @@ class WishlistApp(
                 self.status_label.configure(
                     text=(
                         "Pronto. Clique em "
-                        "Atualizar dados."
+                        "Atualizar biblioteca."
                     )
                 )
 
@@ -3467,10 +3828,10 @@ class WishlistApp(
 
                     self.steam_status_label.configure(
                         text=(
-                            "Steam: ✓ "
-                            f"{len(self.wishlist)} "
-                            "nomes identificados"
-                        )
+                            "●  Steam\n"
+                            f"    {len(self.wishlist)} jogos identificados"
+                        ),
+                        text_color=COLOR_SUCCESS
                     )
 
                     self.update_source_filter()
@@ -3495,7 +3856,7 @@ class WishlistApp(
 
                     self.refresh_button.configure(
                         state="normal",
-                        text="Atualizar dados"
+                        text="↻  Atualizar biblioteca"
                     )
 
                     self.update_integration_status_ui()
@@ -3508,7 +3869,7 @@ class WishlistApp(
 
                     self.refresh_button.configure(
                         state="normal",
-                        text="Atualizar dados"
+                        text="↻  Atualizar biblioteca"
                     )
 
                     self.progress_bar.set(
@@ -3656,9 +4017,8 @@ class WishlistApp(
 
         self.result_count_label.configure(
             text=(
-                f"{len(filtered)} resultado(s) "
-                f"exibido(s) de "
-                f"{len(self.matches)} encontrado(s)."
+                f"{len(filtered)} exibido(s) · "
+                f"{len(self.matches)} encontrado(s)"
             )
         )
 
@@ -3680,7 +4040,25 @@ class WishlistApp(
                 row
             )
 
-        for item in matches:
+        for index, item in enumerate(
+            matches
+        ):
+
+            row_tag = (
+                "row_even"
+                if index % 2 == 0
+                else
+                "row_odd"
+            )
+
+            match_text = (
+                "● EXATO"
+                if item[
+                    "type"
+                ] == "Exato"
+                else
+                "● APROX."
+            )
 
             self.tree.insert(
                 "",
@@ -3698,9 +4076,7 @@ class WishlistApp(
                         "source"
                     ],
 
-                    item[
-                        "type"
-                    ],
+                    match_text,
 
                     f"{item['score']:.1f}%"
                 ),
@@ -3708,13 +4084,9 @@ class WishlistApp(
                     item[
                         "appid"
                     ],
+                    row_tag
                 )
             )
-
-
-    # ========================================================
-    # ABRIR STEAM
-    # ========================================================
 
     def open_selected_steam_page(
         self,
