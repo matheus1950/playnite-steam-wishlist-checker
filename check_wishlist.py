@@ -22,7 +22,7 @@ from rapidfuzz import process, fuzz
 # ============================================================
 
 APP_NAME = "Steam Wishlist × Playnite"
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.2.1"
 
 
 # ============================================================
