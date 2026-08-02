@@ -31,13 +31,13 @@ After running the comparison, you can review the matches and manually remove fro
 
 In this example, the wishlist contained **517 games**, and the app found **19 matches** with games already present in other libraries.
 
-![Before cleaning the wishlist](antes.jpeg)
+![Before cleaning the wishlist](resources/screenshots/antes.jpeg)
 
 ### After
 
 After reviewing the results, running the check again, and manually removing some games that were already owned, the wishlist was reduced to **484 games**, with only **2 remaining matches**.
 
-![After cleaning the wishlist](depois.jpeg)
+![After cleaning the wishlist](resources/screenshots/depois.jpeg)
 
 > Wishlist Checker does not automatically remove games from your Steam account. It only identifies possible matches so you can review them and decide which items you want to remove manually from your wishlist.
 
