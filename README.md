@@ -29,13 +29,13 @@ Após executar a comparação, você pode revisar as correspondências encontrad
 
 Neste exemplo, a wishlist possuía **517 jogos** e o aplicativo encontrou **19 correspondências** com jogos já presentes em outras bibliotecas.
 
-![Antes da limpeza da wishlist](antes.jpeg)
+![Antes da limpeza da wishlist](resources/screenshots/antes.jpeg)
 
 ### Depois
 
 Após revisar os resultados, rodar a conferência mais 2 vezes, remover da wishlist alguns dos jogos já possuídos e executar uma nova verificação, a wishlist passou a ter **484 jogos**, restando apenas **2 correspondências**(inexatas).
 
-![Depois da limpeza da wishlist](depois.jpeg)
+![Depois da limpeza da wishlist](resources/screenshots/depois.jpeg)
 
 > O Wishlist Checker não remove jogos automaticamente da sua conta Steam. O aplicativo apenas identifica possíveis correspondências para que você possa revisá-las e decidir quais itens deseja remover manualmente da wishlist.
 
