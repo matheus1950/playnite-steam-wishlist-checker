@@ -58,3 +58,7 @@ Extraia o arquivo ZIP para uma pasta de sua preferência e execute:
 
 ```text
 WishlistSteamCheck.exe
+
+## Licença
+
+Este projeto é distribuído sob a licença MIT. Consulte o arquivo [LICENSE](LICENSE) para mais detalhes.

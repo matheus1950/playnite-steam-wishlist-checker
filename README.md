@@ -53,10 +53,14 @@ To use the distributed version:
 Python, Visual Studio and the Playnite Interactive SDK are not required.
 
 ## Download
-
+## Download
 Download the latest version from the GitHub **Releases** section.
 
 Extract the ZIP file to a folder of your choice and run:
 
 ```text
 WishlistSteamCheck.exe
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
