@@ -19,6 +19,26 @@ Aplicativo para identificar jogos da sua wishlist da Steam que você já possui 
 - Duplo clique para abrir a página do jogo na Steam
 - Executável standalone para Windows
 
+## Resultado na prática
+
+O objetivo do Wishlist Checker é ajudar a encontrar jogos que continuam na sua wishlist da Steam mesmo que você já os possua em outra biblioteca cadastrada no Playnite.
+
+Após executar a comparação, você pode revisar as correspondências encontradas e remover manualmente da wishlist da Steam os jogos que não precisa mais acompanhar.
+
+### Antes
+
+Neste exemplo, a wishlist possuía **517 jogos** e o aplicativo encontrou **19 correspondências** com jogos já presentes em outras bibliotecas.
+
+![Antes da limpeza da wishlist](antes.jpeg)
+
+### Depois
+
+Após revisar os resultados, rodar a conferência mais 2 vezes, remover da wishlist alguns dos jogos já possuídos e executar uma nova verificação, a wishlist passou a ter **484 jogos**, restando apenas **2 correspondências**(inexatas).
+
+![Depois da limpeza da wishlist](depois.jpeg)
+
+> O Wishlist Checker não remove jogos automaticamente da sua conta Steam. O aplicativo apenas identifica possíveis correspondências para que você possa revisá-las e decidir quais itens deseja remover manualmente da wishlist.
+
 ## Requisitos
 
 Para usar a versão distribuída:
