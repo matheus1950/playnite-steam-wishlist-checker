@@ -1,60 +1,62 @@
 # Steam Wishlist × Playnite
 
-Aplicativo para identificar jogos da sua wishlist da Steam que você já possui em outras bibliotecas cadastradas no Playnite, como Epic Games, GOG, Amazon Games, Xbox, EA app, Battle.net e outras.
+[Português (Brasil)](README.pt-BR.md)
 
-## Funcionalidades
+A Windows desktop app that helps you find games still present in your Steam wishlist that you already own in other libraries connected to Playnite, such as Epic Games, GOG, Amazon Games, Xbox, EA app, Battle.net and others.
 
-- Interface gráfica em modo escuro
-- Leitura automática da biblioteca do Playnite
-- Integração com Playnite por plugin próprio
-- Instalação do plugin diretamente pela interface
-- Configuração persistente do SteamID64
-- Comparação entre wishlist da Steam e biblioteca do Playnite
-- Ignora jogos da própria biblioteca Steam
-- Exibe a biblioteca em que o jogo foi encontrado
-- Match exato e aproximado
-- Filtro por biblioteca
-- Filtro por tipo de correspondência
-- Pesquisa por nome
-- Duplo clique para abrir a página do jogo na Steam
-- Executável standalone para Windows
+## Features
 
-## Resultado na prática
+- Dark mode graphical interface
+- Automatic Playnite library reading
+- Playnite integration through a custom plugin
+- Plugin installation directly from the app
+- Persistent SteamID64 configuration
+- Steam wishlist vs. Playnite library comparison
+- Ignores games from your own Steam library
+- Shows which library each match was found in
+- Exact and approximate matching
+- Filter by library
+- Filter by match type
+- Search by game name
+- Double-click to open the game's Steam page
+- Standalone Windows executable
 
-O objetivo do Wishlist Checker é ajudar a encontrar jogos que continuam na sua wishlist da Steam mesmo que você já os possua em outra biblioteca cadastrada no Playnite.
+## Real-world result
 
-Após executar a comparação, você pode revisar as correspondências encontradas e remover manualmente da wishlist da Steam os jogos que não precisa mais acompanhar.
+The purpose of Wishlist Checker is to help identify games that remain in your Steam wishlist even though you already own them in another library registered in Playnite.
 
-### Antes
+After running the comparison, you can review the matches and manually remove from your Steam wishlist the games you no longer need to track.
 
-Neste exemplo, a wishlist possuía **517 jogos** e o aplicativo encontrou **19 correspondências** com jogos já presentes em outras bibliotecas.
+### Before
 
-![Antes da limpeza da wishlist](resources/screenshots/antes.jpeg)
+In this example, the wishlist contained **517 games**, and the app found **19 matches** with games already present in other libraries.
 
-### Depois
+![Before cleaning the wishlist](antes.jpeg)
 
-Após revisar os resultados, rodar a conferência mais 2 vezes, remover da wishlist alguns dos jogos já possuídos e executar uma nova verificação, a wishlist passou a ter **484 jogos**, restando apenas **2 correspondências**(inexatas).
+### After
 
-![Depois da limpeza da wishlist](resources/screenshots/depois.jpeg)
+After reviewing the results, running the check again, and manually removing some games that were already owned, the wishlist was reduced to **484 games**, with only **2 remaining matches**.
 
-> O Wishlist Checker não remove jogos automaticamente da sua conta Steam. O aplicativo apenas identifica possíveis correspondências para que você possa revisá-las e decidir quais itens deseja remover manualmente da wishlist.
+![After cleaning the wishlist](depois.jpeg)
 
-## Requisitos
+> Wishlist Checker does not automatically remove games from your Steam account. It only identifies possible matches so you can review them and decide which items you want to remove manually from your wishlist.
 
-Para usar a versão distribuída:
+## Requirements
+
+To use the distributed version:
 
 - Windows
-- Playnite instalado
-- Conta Steam com wishlist acessível
-- Conexão com a internet
+- Playnite installed
+- Steam account with an accessible wishlist
+- Internet connection
 
-Não é necessário instalar Python, Visual Studio ou utilizar o SDK Interativo do Playnite.
+Python, Visual Studio and the Playnite Interactive SDK are not required.
 
 ## Download
 
-Baixe a versão mais recente na seção **Releases** do GitHub.
+Download the latest version from the GitHub **Releases** section.
 
-Extraia o arquivo ZIP para uma pasta de sua preferência e execute:
+Extract the ZIP file to a folder of your choice and run:
 
 ```text
 WishlistSteamCheck.exe
