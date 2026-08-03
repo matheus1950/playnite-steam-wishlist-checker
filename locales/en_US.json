@@ -22,7 +22,7 @@
   "language_label": "LANGUAGE / IDIOMA",
   "language_change_title": "Language",
   "language_change_during_update": "Wait for the update to finish before changing the language.",
-  "steam_account_button": "STEAM  ·  Account",
+  "steam_account_button": "STEAM  ·  SteamID64",
   "playnite_integration_button": "PLAYNITE  ·  Integration",
   "status_playnite_checking": "●  Playnite\n    checking...",
   "status_plugin_checking": "●  Plugin\n    checking...",
